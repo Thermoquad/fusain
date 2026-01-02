@@ -1,0 +1,26 @@
+# Copyright (c) 2025 Kaz Walker, Thermoquad
+# SPDX-License-Identifier: Apache-2.0
+
+menuconfig HELIOS_SERIAL
+	bool "Helios Serial Protocol Library"
+	help
+	  Enable the Helios serial protocol encoder/decoder library.
+	  This library provides CRC-16-CCITT calculation, packet encoding
+	  with byte stuffing, and stateful packet decoding for the Helios
+	  serial communication protocol.
+
+	  Note: This is a pure C library with no Zephyr dependencies.
+	  It does NOT require CONFIG_CRC (implements own CRC-16-CCITT).
+	  It does NOT require CONFIG_SERIAL (protocol layer only, no UART).
+
+if HELIOS_SERIAL
+
+config HELIOS_SERIAL_LOG_LEVEL
+	int "Helios Serial Protocol Log Level"
+	default 3
+	range 0 4
+	help
+	  Set the log level for the Helios serial protocol library.
+	  0 = OFF, 1 = ERROR, 2 = WARNING, 3 = INFO, 4 = DEBUG
+
+endif # HELIOS_SERIAL

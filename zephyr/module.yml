@@ -1,0 +1,5 @@
+name: helios_serial
+
+build:
+  cmake: .
+  kconfig: Kconfig
