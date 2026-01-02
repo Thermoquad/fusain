@@ -282,6 +282,19 @@ void helios_create_emergency_stop(helios_packet_t* packet)
   packet->msg_type = HELIOS_MSG_EMERGENCY_STOP;
 }
 
+void helios_create_telemetry_config(helios_packet_t* packet, bool enabled,
+    uint32_t interval_ms, uint32_t mode)
+{
+  helios_cmd_telemetry_config_t cmd = {
+    .telemetry_enabled = enabled ? 1 : 0,
+    .interval_ms = interval_ms,
+    .telemetry_mode = mode
+  };
+  packet->length = sizeof(cmd);
+  packet->msg_type = HELIOS_MSG_TELEMETRY_CONFIG;
+  memcpy(packet->payload, &cmd, sizeof(cmd));
+}
+
 void helios_create_state_data(helios_packet_t* packet, helios_state_t state,
     helios_error_t error)
 {

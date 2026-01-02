@@ -34,6 +34,7 @@ typedef enum {
   HELIOS_MSG_PING_REQUEST = 0x13,
   HELIOS_MSG_SET_TIMEOUT_CONFIG = 0x14,
   HELIOS_MSG_EMERGENCY_STOP = 0x15,
+  HELIOS_MSG_TELEMETRY_CONFIG = 0x16,
 
   /* Data Messages (ICU → Master) */
   HELIOS_MSG_STATE_DATA = 0x20,
@@ -100,6 +101,12 @@ typedef struct __attribute__((packed)) {
   uint8_t timeout_enabled; // 0 = disabled, 1 = enabled
   uint32_t timeout_ms; // Timeout interval in milliseconds
 } helios_cmd_set_timeout_config_t;
+
+typedef struct __attribute__((packed)) {
+  uint32_t telemetry_enabled; // 0 = disabled, 1 = enabled
+  uint32_t interval_ms; // Telemetry broadcast interval (100-5000 ms)
+  uint32_t telemetry_mode; // 0 = bundled, 1 = individual
+} helios_cmd_telemetry_config_t;
 
 /* Data Payloads */
 typedef struct __attribute__((packed)) {
@@ -298,6 +305,17 @@ void helios_create_set_timeout_config(helios_packet_t* packet, bool enabled,
  * @param packet Output packet
  */
 void helios_create_emergency_stop(helios_packet_t* packet);
+
+/**
+ * Create a TELEMETRY_CONFIG packet
+ *
+ * @param packet Output packet
+ * @param enabled Telemetry broadcast enabled (0=disabled, 1=enabled)
+ * @param interval_ms Telemetry broadcast interval (100-5000 ms)
+ * @param mode Telemetry mode (0=bundled, 1=individual)
+ */
+void helios_create_telemetry_config(helios_packet_t* packet, bool enabled,
+    uint32_t interval_ms, uint32_t mode);
 
 /**
  * Create a STATE_DATA packet
