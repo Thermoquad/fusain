@@ -345,3 +345,31 @@ int helios_create_telemetry_bundle(
 
   return 0;
 }
+
+/**
+ * Human-readable names for helios_mode_t values
+ *
+ * These arrays provide string representations of mode/state enums
+ * for logging, UI display, and debugging purposes.
+ */
+const char* const helios_mode_names[3] = {
+  [HELIOS_MODE_IDLE] = "IDLE",
+  [HELIOS_MODE_FAN] = "FAN",
+  [HELIOS_MODE_HEAT] = "HEAT",
+  // HELIOS_MODE_EMERGENCY (0xFF) not included - handle separately
+};
+
+/**
+ * Human-readable names for helios_state_t values
+ */
+const char* const helios_state_names[9] = {
+  [HELIOS_STATE_INITIALIZING] = "INITIALIZING",
+  [HELIOS_STATE_IDLE] = "IDLE",
+  [HELIOS_STATE_BLOWING] = "BLOWING",
+  [HELIOS_STATE_PREHEAT] = "PREHEAT",
+  [HELIOS_STATE_PREHEAT_STAGE_2] = "PREHEAT_STAGE_2",
+  [HELIOS_STATE_HEATING] = "HEATING",
+  [HELIOS_STATE_COOLING] = "COOLING",
+  [HELIOS_STATE_ERROR] = "ERROR",
+  [HELIOS_STATE_E_STOP] = "E_STOP",
+};

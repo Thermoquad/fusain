@@ -356,4 +356,44 @@ int helios_create_telemetry_bundle(helios_packet_t* packet,
     const helios_telemetry_temperature_t* temperatures,
     uint8_t temp_count);
 
+/**
+ * Helios state command message (for Zbus/IPC)
+ *
+ * This structure is used for inter-process communication (e.g., Zbus)
+ * to request mode changes on Helios. It is NOT the protocol packet format.
+ *
+ * For the wire protocol representation, see helios_cmd_set_mode_t.
+ */
+typedef struct {
+  helios_mode_t mode; // Target mode (IDLE, FAN, HEAT, EMERGENCY)
+  uint32_t parameter; // Mode parameter (RPM for FAN, pump rate for HEAT)
+} helios_state_command_msg_t;
+
+/**
+ * Human-readable names for helios_mode_t values
+ *
+ * Index corresponds to helios_mode_t enum values:
+ * - [0] = HELIOS_MODE_IDLE
+ * - [1] = HELIOS_MODE_FAN
+ * - [2] = HELIOS_MODE_HEAT
+ * - [0xFF] = HELIOS_MODE_EMERGENCY (not in array, use special handling)
+ */
+extern const char* const helios_mode_names[3];
+
+/**
+ * Human-readable names for helios_state_t values
+ *
+ * Index corresponds to helios_state_t enum values:
+ * - [0] = HELIOS_STATE_INITIALIZING
+ * - [1] = HELIOS_STATE_IDLE
+ * - [2] = HELIOS_STATE_BLOWING
+ * - [3] = HELIOS_STATE_PREHEAT
+ * - [4] = HELIOS_STATE_PREHEAT_STAGE_2
+ * - [5] = HELIOS_STATE_HEATING
+ * - [6] = HELIOS_STATE_COOLING
+ * - [7] = HELIOS_STATE_ERROR
+ * - [8] = HELIOS_STATE_E_STOP
+ */
+extern const char* const helios_state_names[9];
+
 #endif /* FUSAIN_H_ */
