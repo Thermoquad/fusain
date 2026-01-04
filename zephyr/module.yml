@@ -1,4 +1,4 @@
-name: helios_serial
+name: fusain
 
 build:
   cmake: .

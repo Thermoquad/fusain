@@ -1,6 +1,8 @@
-# Helios Serial Protocol Library
+# Fusain Utility Library
 
 Reusable C library for encoding and decoding Helios serial protocol packets.
+
+**Fusain** (fossilized charcoal) provides a platform-independent implementation of the Helios communication protocol.
 
 ## Features
 
@@ -24,13 +26,13 @@ Reusable C library for encoding and decoding Helios serial protocol packets.
 ### Enable in Kconfig
 
 ```kconfig
-CONFIG_HELIOS_SERIAL=y
+CONFIG_FUSAIN=y
 ```
 
 ### Include Header
 
 ```c
-#include <helios_serial/helios_serial.h>
+#include <fusain/fusain.h>
 ```
 
 ### Encoding Example
@@ -56,30 +58,24 @@ uart_send(tx_buffer, len);
 
 ```c
 // Decoder state (persistent)
-uint8_t decoder_state = 0;
-uint8_t decode_buffer[HELIOS_MAX_PACKET_SIZE];
-size_t decode_buffer_index = 0;
-bool decode_escape_next = false;
+helios_decoder_t decoder;
 
 // Initialize decoder
-helios_reset_decoder(&decoder_state, &decode_buffer_index, &decode_escape_next);
+helios_reset_decoder(&decoder);
 
 // Process incoming bytes
 while (uart_has_data()) {
     uint8_t byte = uart_read_byte();
     helios_packet_t packet;
 
-    helios_decode_result_t result = helios_decode_byte(
-        byte, &packet, &decoder_state, decode_buffer,
-        &decode_buffer_index, &decode_escape_next
-    );
+    helios_decode_result_t result = helios_decode_byte(byte, &packet, &decoder);
 
     if (result == HELIOS_DECODE_OK) {
         // Packet complete and valid
         process_packet(&packet);
     } else if (result != HELIOS_DECODE_INCOMPLETE) {
         // Decode error - reset decoder
-        helios_reset_decoder(&decoder_state, &decode_buffer_index, &decode_escape_next);
+        helios_reset_decoder(&decoder);
     }
 }
 ```
@@ -104,17 +100,14 @@ Returns number of bytes written, or negative error code.
 helios_decode_result_t helios_decode_byte(
     uint8_t rx_byte,
     helios_packet_t* packet,
-    uint8_t* state,
-    uint8_t* buffer,
-    size_t* buffer_index,
-    bool* escape_next
+    helios_decoder_t* decoder
 );
 ```
 Returns: `HELIOS_DECODE_OK`, `HELIOS_DECODE_INCOMPLETE`, or error code.
 
 **Decoder Reset:**
 ```c
-void helios_reset_decoder(uint8_t* state, size_t* buffer_index, bool* escape_next);
+void helios_reset_decoder(helios_decoder_t* decoder);
 ```
 
 ### Helper Functions
@@ -131,7 +124,7 @@ The library provides helper functions for creating common message types:
 - `helios_create_ping_response()` - Ping response (heartbeat)
 - `helios_create_telemetry_bundle()` - Aggregated telemetry data
 
-See `include/helios_serial/helios_serial.h` for complete API documentation.
+See `include/fusain/fusain.h` for complete API documentation.
 
 ## Message Types
 

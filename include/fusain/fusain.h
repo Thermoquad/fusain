@@ -2,14 +2,14 @@
  * Copyright (c) 2025 Kaz Walker, Thermoquad
  * SPDX-License-Identifier: Apache-2.0
  *
- * Helios Serial Protocol - Shared Library
+ * Fusain Serial Protocol - Shared Library
  *
  * This library provides reusable functions for encoding/decoding Helios serial
  * protocol packets. Can be used by both ICU (slave) and controller (master).
  */
 
-#ifndef HELIOS_SERIAL_HELIOS_SERIAL_H
-#define HELIOS_SERIAL_HELIOS_SERIAL_H
+#ifndef FUSAIN_H_
+#define FUSAIN_H_
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -21,8 +21,8 @@
 #define HELIOS_ESC_BYTE 0x7D
 #define HELIOS_ESC_XOR 0x20
 
-#define HELIOS_MAX_PACKET_SIZE 64
-#define HELIOS_MAX_PAYLOAD_SIZE 58
+#define HELIOS_MAX_PACKET_SIZE 128
+#define HELIOS_MAX_PAYLOAD_SIZE 122
 #define HELIOS_MIN_PACKET_SIZE 6 // START + LEN + TYPE + CRC(2) + END
 
 /* Message Type Definitions */
@@ -118,6 +118,7 @@ typedef struct __attribute__((packed)) {
   int32_t rpm;
   int32_t target_rpm;
   int32_t pwm_duty;
+  int32_t pwm_period;
   int32_t min_rpm;
   int32_t max_rpm;
 } helios_data_motor_t;
@@ -153,6 +154,7 @@ typedef struct __attribute__((packed)) {
   int32_t rpm;
   int32_t target_rpm;
   int32_t pwm_duty;
+  int32_t pwm_period;
 } helios_telemetry_motor_t;
 
 typedef struct __attribute__((packed)) {
@@ -204,6 +206,14 @@ typedef enum {
   HELIOS_DECODE_BUFFER_OVERFLOW = 5,
 } helios_decode_result_t;
 
+/* Decoder State */
+typedef struct {
+  uint8_t state; // Internal state machine state
+  uint8_t buffer[HELIOS_MAX_PACKET_SIZE]; // Internal decode buffer
+  size_t buffer_index; // Current position in buffer
+  bool escape_next; // Escape sequence flag
+} helios_decoder_t;
+
 /* Function Declarations */
 
 /**
@@ -234,27 +244,19 @@ int helios_encode_packet(const helios_packet_t* packet, uint8_t* buffer,
  *
  * @param rx_byte Received byte to process
  * @param packet Output packet structure
- * @param state Decoder state (initialize to 0)
- * @param buffer Internal decode buffer (must be HELIOS_MAX_PACKET_SIZE)
- * @param buffer_index Current buffer index (initialize to 0)
- * @param escape_next Escape flag (initialize to false)
+ * @param decoder Decoder state (initialize with helios_reset_decoder)
  * @return Decode result status
  */
 helios_decode_result_t helios_decode_byte(uint8_t rx_byte,
     helios_packet_t* packet,
-    uint8_t* state, uint8_t* buffer,
-    size_t* buffer_index,
-    bool* escape_next);
+    helios_decoder_t* decoder);
 
 /**
  * Reset decoder state
  *
- * @param state Decoder state to reset
- * @param buffer_index Buffer index to reset
- * @param escape_next Escape flag to reset
+ * @param decoder Decoder state to reset
  */
-void helios_reset_decoder(uint8_t* state, size_t* buffer_index,
-    bool* escape_next);
+void helios_reset_decoder(helios_decoder_t* decoder);
 
 /**
  * Create a SET_MODE command packet
@@ -354,4 +356,4 @@ int helios_create_telemetry_bundle(helios_packet_t* packet,
     const helios_telemetry_temperature_t* temperatures,
     uint8_t temp_count);
 
-#endif /* HELIOS_SERIAL_HELIOS_SERIAL_H */
+#endif /* FUSAIN_H_ */

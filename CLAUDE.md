@@ -1,12 +1,12 @@
-# Helios Serial Protocol Library - AI Assistant Guide
+# Fusain Serial Protocol Library - AI Assistant Guide
 
-> **Note:** This file documents the helios_serial module specifically.
+> **Note:** This file documents the fusain module specifically.
 > Always read the [Thermoquad Organization CLAUDE.md](../../../CLAUDE.md) first
 > for organization-wide structure and conventions.
 
 ## Module Overview
 
-**helios_serial** is a platform-independent C library that implements the Helios serial communication protocol. It provides CRC-16-CCITT calculation, packet encoding with byte stuffing, and stateful packet decoding for reliable serial communication.
+**fusain** is a platform-independent C library that implements the Helios serial communication protocol. It provides CRC-16-CCITT calculation, packet encoding with byte stuffing, and stateful packet decoding for reliable serial communication.
 
 **Key Features:**
 - Pure C implementation with zero dependencies beyond standard C library
@@ -110,7 +110,7 @@ The CRC is calculated over the unstuffed data and then the CRC bytes themselves 
 ## File Structure
 
 ```
-helios_serial/
+fusain/
 ├── CLAUDE.md               # This file
 ├── README.md               # User documentation
 ├── LICENSE.md              # Apache-2.0 license
@@ -119,10 +119,10 @@ helios_serial/
 ├── zephyr/
 │   └── module.yml          # Zephyr module metadata
 ├── include/
-│   └── helios_serial/
-│       └── helios_serial.h # Public API header
+│   └── fusain/
+│       └── fusain.h        # Public API header
 └── src/
-    └── helios_serial.c     # Protocol implementation
+    └── fusain.c            # Protocol implementation
 ```
 
 ---
@@ -293,7 +293,7 @@ int helios_create_telemetry_bundle(helios_packet_t* packet,
 ### Basic Encoding
 
 ```c
-#include <helios_serial/helios_serial.h>
+#include <fusain/fusain.h>
 
 // Create a ping request
 helios_packet_t packet;
@@ -315,26 +315,20 @@ if (len > 0) {
 ### Basic Decoding
 
 ```c
-#include <helios_serial/helios_serial.h>
+#include <fusain/fusain.h>
 
 // Decoder state (persistent)
-uint8_t decoder_state = 0;
-uint8_t decode_buffer[HELIOS_MAX_PACKET_SIZE];
-size_t decode_buffer_index = 0;
-bool decode_escape_next = false;
+helios_decoder_t decoder;
 
 // Initialize decoder
-helios_reset_decoder(&decoder_state, &decode_buffer_index, &decode_escape_next);
+helios_reset_decoder(&decoder);
 
 // Process incoming bytes
 while (uart_has_data()) {
     uint8_t byte = uart_read_byte();
     helios_packet_t packet;
 
-    helios_decode_result_t result = helios_decode_byte(
-        byte, &packet, &decoder_state, decode_buffer,
-        &decode_buffer_index, &decode_escape_next
-    );
+    helios_decode_result_t result = helios_decode_byte(byte, &packet, &decoder);
 
     if (result == HELIOS_DECODE_OK) {
         // Packet complete and valid
@@ -343,7 +337,7 @@ while (uart_has_data()) {
     } else if (result != HELIOS_DECODE_INCOMPLETE) {
         // Decode error - reset and continue
         printf("Decode error: %d\n", result);
-        helios_reset_decoder(&decoder_state, &decode_buffer_index, &decode_escape_next);
+        helios_reset_decoder(&decoder);
     }
 }
 ```
@@ -351,7 +345,7 @@ while (uart_has_data()) {
 ### Creating Telemetry Bundle
 
 ```c
-#include <helios_serial/helios_serial.h>
+#include <fusain/fusain.h>
 
 // Prepare motor data (supports 1-3 motors)
 helios_telemetry_motor_t motors[1] = {
@@ -398,8 +392,8 @@ if (ret == 0) {
 **1. Add module to application CMakeLists.txt:**
 
 ```cmake
-# Add helios_serial module
-list(APPEND EXTRA_ZEPHYR_MODULES ${CMAKE_CURRENT_SOURCE_DIR}/../../modules/lib/helios_serial)
+# Add fusain module
+list(APPEND EXTRA_ZEPHYR_MODULES ${CMAKE_CURRENT_SOURCE_DIR}/../../modules/lib/fusain)
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 ```
@@ -407,13 +401,13 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 **2. Enable in prj.conf:**
 
 ```kconfig
-CONFIG_HELIOS_SERIAL=y
+CONFIG_FUSAIN=y
 ```
 
 **3. Include header:**
 
 ```c
-#include <helios_serial/helios_serial.h>
+#include <fusain/fusain.h>
 ```
 
 ### Standalone C Integration
@@ -422,18 +416,18 @@ CONFIG_HELIOS_SERIAL=y
 
 ```cmake
 target_sources(myapp PRIVATE
-    path/to/helios_serial/src/helios_serial.c
+    path/to/fusain/src/fusain.c
 )
 
 target_include_directories(myapp PRIVATE
-    path/to/helios_serial/include
+    path/to/fusain/include
 )
 ```
 
 **2. Include header:**
 
 ```c
-#include <helios_serial/helios_serial.h>
+#include <fusain/fusain.h>
 ```
 
 **3. No additional dependencies required** - uses only standard C library
@@ -444,11 +438,11 @@ target_include_directories(myapp PRIVATE
 
 ### Kconfig Options
 
-**CONFIG_HELIOS_SERIAL** (bool)
-- Enable the Helios serial protocol library
+**CONFIG_FUSAIN** (bool)
+- Enable the Fusain serial protocol library
 - Default: n
 
-**CONFIG_HELIOS_SERIAL_LOG_LEVEL** (int)
+**CONFIG_FUSAIN_LOG_LEVEL** (int)
 - Log level for the protocol library
 - Range: 0-4 (0=OFF, 1=ERROR, 2=WARNING, 3=INFO, 4=DEBUG)
 - Default: 3
@@ -626,9 +620,9 @@ void process_command(const helios_packet_t* packet) {
 ### Common Issues
 
 **1. Include path not found**
-- **Symptom:** `fatal error: helios_serial/helios_serial.h: No such file or directory`
+- **Symptom:** `fatal error: fusain/fusain.h: No such file or directory`
 - **Solution:** Ensure module include directory is added to build system
-  - Zephyr: Verify `CONFIG_HELIOS_SERIAL=y` and `EXTRA_ZEPHYR_MODULES` is set
+  - Zephyr: Verify `CONFIG_FUSAIN=y` and `EXTRA_ZEPHYR_MODULES` is set
   - Standalone: Verify `target_include_directories()` includes module path
 
 **2. Decoder returns INVALID_CRC**

@@ -2,11 +2,12 @@
  * Copyright (c) 2025 Kaz Walker, Thermoquad
  * SPDX-License-Identifier: Apache-2.0
  *
- * Helios Serial Protocol - Shared Library Implementation
+ * Fusain Serial Protocol - Shared Library Implementation
  */
-
-#include <helios_serial/helios_serial.h>
+#include <stdint.h>
 #include <string.h>
+
+#include <fusain/fusain.h>
 
 /* Decoder States */
 #define DECODER_STATE_IDLE 0
@@ -97,9 +98,7 @@ int helios_encode_packet(const helios_packet_t* packet, uint8_t* buffer,
 
   // Stuff PAYLOAD bytes
   for (uint8_t i = 0; i < packet->length; i++) {
-    if (stuff_byte(packet->payload[i], buffer, buffer_size,
-            &index)
-        < 0) {
+    if (stuff_byte(packet->payload[i], buffer, buffer_size, &index) < 0) {
       return -6;
     }
   }
@@ -126,111 +125,104 @@ int helios_encode_packet(const helios_packet_t* packet, uint8_t* buffer,
 /* Packet Decoding */
 helios_decode_result_t helios_decode_byte(uint8_t rx_byte,
     helios_packet_t* packet,
-    uint8_t* state, uint8_t* buffer,
-    size_t* buffer_index,
-    bool* escape_next)
+    helios_decoder_t* decoder)
 {
   // Handle START byte - reset decoder
-  if (rx_byte == HELIOS_START_BYTE && !(*escape_next)) {
-    *state = DECODER_STATE_LENGTH;
-    *buffer_index = 0;
-    *escape_next = false;
+  if (rx_byte == HELIOS_START_BYTE && !(decoder->escape_next)) {
+    decoder->state = DECODER_STATE_LENGTH;
+    decoder->buffer_index = 0;
+    decoder->escape_next = false;
     return HELIOS_DECODE_INCOMPLETE;
   }
 
   // Handle escape sequences
-  if (rx_byte == HELIOS_ESC_BYTE && !(*escape_next)) {
-    *escape_next = true;
+  if (rx_byte == HELIOS_ESC_BYTE && !(decoder->escape_next)) {
+    decoder->escape_next = true;
     return HELIOS_DECODE_INCOMPLETE;
   }
 
   // Unescape byte if needed
   uint8_t byte = rx_byte;
-  if (*escape_next) {
+  if (decoder->escape_next) {
     byte ^= HELIOS_ESC_XOR;
-    *escape_next = false;
+    decoder->escape_next = false;
   }
 
   // State machine
-  switch (*state) {
+  switch (decoder->state) {
   case DECODER_STATE_IDLE:
     // Waiting for START byte
     return HELIOS_DECODE_INCOMPLETE;
 
   case DECODER_STATE_LENGTH:
     if (byte > HELIOS_MAX_PAYLOAD_SIZE) {
-      *state = DECODER_STATE_IDLE;
+      decoder->state = DECODER_STATE_IDLE;
       return HELIOS_DECODE_INVALID_LENGTH;
     }
     packet->length = byte;
-    buffer[(*buffer_index)++] = byte;
-    *state = DECODER_STATE_TYPE;
+    decoder->buffer[decoder->buffer_index++] = byte;
+    decoder->state = DECODER_STATE_TYPE;
     return HELIOS_DECODE_INCOMPLETE;
 
   case DECODER_STATE_TYPE:
     packet->msg_type = byte;
-    buffer[(*buffer_index)++] = byte;
+    decoder->buffer[decoder->buffer_index++] = byte;
     if (packet->length == 0) {
       // No payload, move to CRC
-      *state = DECODER_STATE_CRC1;
+      decoder->state = DECODER_STATE_CRC1;
     } else {
-      *state = DECODER_STATE_PAYLOAD;
+      decoder->state = DECODER_STATE_PAYLOAD;
     }
     return HELIOS_DECODE_INCOMPLETE;
 
   case DECODER_STATE_PAYLOAD:
-    if (*buffer_index >= packet->length + 2) {
-      *state = DECODER_STATE_IDLE;
-      return HELIOS_DECODE_BUFFER_OVERFLOW;
-    }
-    packet->payload[*buffer_index - 2] = byte;
-    buffer[(*buffer_index)++] = byte;
-    if (*buffer_index >= packet->length + 2) {
+    packet->payload[decoder->buffer_index - 2] = byte;
+    decoder->buffer[decoder->buffer_index++] = byte;
+    if (decoder->buffer_index >= packet->length + 2) {
       // Payload complete, move to CRC
-      *state = DECODER_STATE_CRC1;
+      decoder->state = DECODER_STATE_CRC1;
     }
     return HELIOS_DECODE_INCOMPLETE;
 
   case DECODER_STATE_CRC1:
     packet->crc = (uint16_t)byte << 8;
-    *state = DECODER_STATE_CRC2;
+    decoder->state = DECODER_STATE_CRC2;
     return HELIOS_DECODE_INCOMPLETE;
 
   case DECODER_STATE_CRC2:
     packet->crc |= byte;
-    *state = DECODER_STATE_END;
+    decoder->state = DECODER_STATE_END;
     return HELIOS_DECODE_INCOMPLETE;
 
   case DECODER_STATE_END:
     if (rx_byte != HELIOS_END_BYTE) {
-      *state = DECODER_STATE_IDLE;
+      decoder->state = DECODER_STATE_IDLE;
       return HELIOS_DECODE_INVALID_START;
     }
 
     // Validate CRC
-    uint16_t calculated_crc = helios_crc16(buffer, packet->length + 2);
+    uint16_t calculated_crc = helios_crc16(decoder->buffer, packet->length + 2);
     if (calculated_crc != packet->crc) {
-      *state = DECODER_STATE_IDLE;
+      decoder->state = DECODER_STATE_IDLE;
       return HELIOS_DECODE_INVALID_CRC;
     }
 
     // Packet complete and valid
-    *state = DECODER_STATE_IDLE;
+    decoder->state = DECODER_STATE_IDLE;
     return HELIOS_DECODE_OK;
 
   default:
-    *state = DECODER_STATE_IDLE;
+    decoder->state = DECODER_STATE_IDLE;
     return HELIOS_DECODE_INVALID_START;
   }
 }
 
 /* Reset Decoder */
-void helios_reset_decoder(uint8_t* state, size_t* buffer_index,
-    bool* escape_next)
+void helios_reset_decoder(helios_decoder_t* decoder)
 {
-  *state = DECODER_STATE_IDLE;
-  *buffer_index = 0;
-  *escape_next = false;
+  decoder->state = DECODER_STATE_IDLE;
+  decoder->buffer_index = 0;
+  decoder->escape_next = false;
 }
 
 /* Helper Functions to Create Packets */
@@ -252,7 +244,8 @@ void helios_create_set_pump_rate(helios_packet_t* packet, uint32_t rate_ms)
   memcpy(packet->payload, &cmd, sizeof(cmd));
 }
 
-void helios_create_set_target_rpm(helios_packet_t* packet, uint32_t target_rpm)
+void helios_create_set_target_rpm(helios_packet_t* packet,
+    uint32_t target_rpm)
 {
   helios_cmd_set_target_rpm_t cmd = { .target_rpm = target_rpm };
   packet->length = sizeof(cmd);
@@ -285,11 +278,9 @@ void helios_create_emergency_stop(helios_packet_t* packet)
 void helios_create_telemetry_config(helios_packet_t* packet, bool enabled,
     uint32_t interval_ms, uint32_t mode)
 {
-  helios_cmd_telemetry_config_t cmd = {
-    .telemetry_enabled = enabled ? 1 : 0,
+  helios_cmd_telemetry_config_t cmd = { .telemetry_enabled = enabled ? 1 : 0,
     .interval_ms = interval_ms,
-    .telemetry_mode = mode
-  };
+    .telemetry_mode = mode };
   packet->length = sizeof(cmd);
   packet->msg_type = HELIOS_MSG_TELEMETRY_CONFIG;
   memcpy(packet->payload, &cmd, sizeof(cmd));
@@ -312,12 +303,10 @@ void helios_create_ping_response(helios_packet_t* packet, uint64_t uptime_ms)
   memcpy(packet->payload, &data, sizeof(data));
 }
 
-int helios_create_telemetry_bundle(helios_packet_t* packet,
-    helios_state_t state, helios_error_t error,
-    const helios_telemetry_motor_t* motors,
-    uint8_t motor_count,
-    const helios_telemetry_temperature_t* temperatures,
-    uint8_t temp_count)
+int helios_create_telemetry_bundle(
+    helios_packet_t* packet, helios_state_t state, helios_error_t error,
+    const helios_telemetry_motor_t* motors, uint8_t motor_count,
+    const helios_telemetry_temperature_t* temperatures, uint8_t temp_count)
 {
   // Validate counts
   if (motor_count > HELIOS_MAX_MOTORS || temp_count > HELIOS_MAX_TEMPERATURES || motor_count == 0 || temp_count == 0) {
