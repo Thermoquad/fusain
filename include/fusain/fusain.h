@@ -31,12 +31,10 @@ typedef enum {
   HELIOS_MSG_STATE_COMMAND = 0x10,
   HELIOS_MSG_MOTOR_COMMAND = 0x11,
   HELIOS_MSG_PUMP_COMMAND = 0x12,
-  HELIOS_MSG_PING_REQUEST = 0x13,  // NOTE: Protocol spec shows 0x1F, but using 0x13 for compatibility
+  HELIOS_MSG_GLOW_COMMAND = 0x13,
   HELIOS_MSG_TEMP_COMMAND = 0x14,
-  HELIOS_MSG_EMERGENCY_STOP = 0x15,
   HELIOS_MSG_TELEMETRY_CONFIG = 0x16,
-  HELIOS_MSG_SET_TIMEOUT_CONFIG = 0x17,  // DEPRECATED: Timeout is automatic per protocol spec
-  HELIOS_MSG_GLOW_COMMAND = 0x18,  // NOTE: Protocol spec shows 0x13, moved to avoid conflict
+  HELIOS_MSG_PING_REQUEST = 0x1F,
 
   /* Data Messages (ICU → Master) */
   HELIOS_MSG_STATE_DATA = 0x20,
@@ -100,9 +98,9 @@ typedef struct __attribute__((packed)) {
 } helios_cmd_set_target_rpm_t;
 
 typedef struct __attribute__((packed)) {
-  uint8_t timeout_enabled; // 0 = disabled, 1 = enabled
-  uint32_t timeout_ms; // Timeout interval in milliseconds
-} helios_cmd_set_timeout_config_t;
+  int32_t glow;      // Glow plug index (0-9, typically 0)
+  int32_t duration;  // Burn duration in milliseconds (0-300000)
+} helios_cmd_glow_t;
 
 typedef struct __attribute__((packed)) {
   uint32_t telemetry_enabled; // 0 = disabled, 1 = enabled
@@ -287,28 +285,21 @@ void helios_create_set_pump_rate(helios_packet_t* packet, uint32_t rate_ms);
 void helios_create_set_target_rpm(helios_packet_t* packet, uint32_t target_rpm);
 
 /**
+ * Create a GLOW_COMMAND packet
+ *
+ * @param packet Output packet
+ * @param glow Glow plug index (0-9, typically 0)
+ * @param duration Burn duration in milliseconds (0-300000)
+ */
+void helios_create_glow_command(helios_packet_t* packet, int32_t glow,
+    int32_t duration);
+
+/**
  * Create a PING_REQUEST packet
  *
  * @param packet Output packet
  */
 void helios_create_ping_request(helios_packet_t* packet);
-
-/**
- * Create a SET_TIMEOUT_CONFIG packet
- *
- * @param packet Output packet
- * @param enabled Timeout mode enabled
- * @param timeout_ms Timeout interval in milliseconds
- */
-void helios_create_set_timeout_config(helios_packet_t* packet, bool enabled,
-    uint32_t timeout_ms);
-
-/**
- * Create an EMERGENCY_STOP packet
- *
- * @param packet Output packet
- */
-void helios_create_emergency_stop(helios_packet_t* packet);
 
 /**
  * Create a TELEMETRY_CONFIG packet

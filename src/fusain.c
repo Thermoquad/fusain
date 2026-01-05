@@ -253,26 +253,19 @@ void helios_create_set_target_rpm(helios_packet_t* packet,
   memcpy(packet->payload, &cmd, sizeof(cmd));
 }
 
+void helios_create_glow_command(helios_packet_t* packet, int32_t glow,
+    int32_t duration)
+{
+  helios_cmd_glow_t cmd = { .glow = glow, .duration = duration };
+  packet->length = sizeof(cmd);
+  packet->msg_type = HELIOS_MSG_GLOW_COMMAND;
+  memcpy(packet->payload, &cmd, sizeof(cmd));
+}
+
 void helios_create_ping_request(helios_packet_t* packet)
 {
   packet->length = 0;
   packet->msg_type = HELIOS_MSG_PING_REQUEST;
-}
-
-void helios_create_set_timeout_config(helios_packet_t* packet, bool enabled,
-    uint32_t timeout_ms)
-{
-  helios_cmd_set_timeout_config_t cmd = { .timeout_enabled = enabled ? 1 : 0,
-    .timeout_ms = timeout_ms };
-  packet->length = sizeof(cmd);
-  packet->msg_type = HELIOS_MSG_SET_TIMEOUT_CONFIG;
-  memcpy(packet->payload, &cmd, sizeof(cmd));
-}
-
-void helios_create_emergency_stop(helios_packet_t* packet)
-{
-  packet->length = 0;
-  packet->msg_type = HELIOS_MSG_EMERGENCY_STOP;
 }
 
 void helios_create_telemetry_config(helios_packet_t* packet, bool enabled,
