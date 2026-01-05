@@ -232,7 +232,7 @@ void helios_create_set_mode(helios_packet_t* packet, helios_mode_t mode,
 {
   helios_cmd_set_mode_t cmd = { .mode = mode, .parameter = parameter };
   packet->length = sizeof(cmd);
-  packet->msg_type = HELIOS_MSG_SET_MODE;
+  packet->msg_type = HELIOS_MSG_STATE_COMMAND;
   memcpy(packet->payload, &cmd, sizeof(cmd));
 }
 
@@ -240,7 +240,7 @@ void helios_create_set_pump_rate(helios_packet_t* packet, uint32_t rate_ms)
 {
   helios_cmd_set_pump_rate_t cmd = { .rate_ms = rate_ms };
   packet->length = sizeof(cmd);
-  packet->msg_type = HELIOS_MSG_SET_PUMP_RATE;
+  packet->msg_type = HELIOS_MSG_PUMP_COMMAND;
   memcpy(packet->payload, &cmd, sizeof(cmd));
 }
 
@@ -249,7 +249,7 @@ void helios_create_set_target_rpm(helios_packet_t* packet,
 {
   helios_cmd_set_target_rpm_t cmd = { .target_rpm = target_rpm };
   packet->length = sizeof(cmd);
-  packet->msg_type = HELIOS_MSG_SET_TARGET_RPM;
+  packet->msg_type = HELIOS_MSG_MOTOR_COMMAND;
   memcpy(packet->payload, &cmd, sizeof(cmd));
 }
 

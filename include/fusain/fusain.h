@@ -28,13 +28,15 @@
 /* Message Type Definitions */
 typedef enum {
   /* Command Messages (Master → ICU) */
-  HELIOS_MSG_SET_MODE = 0x10,
-  HELIOS_MSG_SET_PUMP_RATE = 0x11,
-  HELIOS_MSG_SET_TARGET_RPM = 0x12,
-  HELIOS_MSG_PING_REQUEST = 0x13,
-  HELIOS_MSG_SET_TIMEOUT_CONFIG = 0x14,
+  HELIOS_MSG_STATE_COMMAND = 0x10,
+  HELIOS_MSG_MOTOR_COMMAND = 0x11,
+  HELIOS_MSG_PUMP_COMMAND = 0x12,
+  HELIOS_MSG_PING_REQUEST = 0x13,  // NOTE: Protocol spec shows 0x1F, but using 0x13 for compatibility
+  HELIOS_MSG_TEMP_COMMAND = 0x14,
   HELIOS_MSG_EMERGENCY_STOP = 0x15,
   HELIOS_MSG_TELEMETRY_CONFIG = 0x16,
+  HELIOS_MSG_SET_TIMEOUT_CONFIG = 0x17,  // DEPRECATED: Timeout is automatic per protocol spec
+  HELIOS_MSG_GLOW_COMMAND = 0x18,  // NOTE: Protocol spec shows 0x13, moved to avoid conflict
 
   /* Data Messages (ICU → Master) */
   HELIOS_MSG_STATE_DATA = 0x20,
