@@ -12,11 +12,12 @@
 /* Decoder States */
 #define DECODER_STATE_IDLE 0
 #define DECODER_STATE_LENGTH 1
-#define DECODER_STATE_TYPE 2
-#define DECODER_STATE_PAYLOAD 3
-#define DECODER_STATE_CRC1 4
-#define DECODER_STATE_CRC2 5
-#define DECODER_STATE_END 6
+#define DECODER_STATE_ADDRESS 2
+#define DECODER_STATE_TYPE 3
+#define DECODER_STATE_PAYLOAD 4
+#define DECODER_STATE_CRC1 5
+#define DECODER_STATE_CRC2 6
+#define DECODER_STATE_END 7
 
 /* CRC-16-CCITT Calculation */
 uint16_t fusain_crc16(const uint8_t* data, size_t length)
@@ -79,16 +80,28 @@ int fusain_encode_packet(const fusain_packet_t* packet, uint8_t* buffer,
   }
   buffer[index++] = FUSAIN_START_BYTE;
 
-  // Calculate CRC over LENGTH + TYPE + PAYLOAD
-  uint8_t crc_data[FUSAIN_MAX_PAYLOAD_SIZE + 2];
+  // Calculate CRC over LENGTH + ADDRESS + TYPE + PAYLOAD
+  uint8_t crc_data[FUSAIN_MAX_PAYLOAD_SIZE + 10]; // +1 length +8 address +1 type
   crc_data[0] = packet->length;
-  crc_data[1] = packet->msg_type;
-  memcpy(&crc_data[2], packet->payload, packet->length);
-  uint16_t crc = fusain_crc16(crc_data, packet->length + 2);
+  // Add address bytes (little-endian)
+  for (int i = 0; i < 8; i++) {
+    crc_data[1 + i] = (packet->address >> (i * 8)) & 0xFF;
+  }
+  crc_data[9] = packet->msg_type;
+  memcpy(&crc_data[10], packet->payload, packet->length);
+  uint16_t crc = fusain_crc16(crc_data, packet->length + 10);
 
   // Stuff LENGTH byte
   if (stuff_byte(packet->length, buffer, buffer_size, &index) < 0) {
     return -4;
+  }
+
+  // Stuff ADDRESS bytes (little-endian)
+  for (int i = 0; i < 8; i++) {
+    uint8_t addr_byte = (packet->address >> (i * 8)) & 0xFF;
+    if (stuff_byte(addr_byte, buffer, buffer_size, &index) < 0) {
+      return -4;
+    }
   }
 
   // Stuff TYPE byte
@@ -132,6 +145,8 @@ fusain_decode_result_t fusain_decode_byte(uint8_t rx_byte,
     decoder->state = DECODER_STATE_LENGTH;
     decoder->buffer_index = 0;
     decoder->escape_next = false;
+    decoder->addr_byte_count = 0;
+    packet->address = 0; // Initialize address
     return FUSAIN_DECODE_INCOMPLETE;
   }
 
@@ -161,7 +176,19 @@ fusain_decode_result_t fusain_decode_byte(uint8_t rx_byte,
     }
     packet->length = byte;
     decoder->buffer[decoder->buffer_index++] = byte;
-    decoder->state = DECODER_STATE_TYPE;
+    decoder->addr_byte_count = 0; // Initialize address byte counter
+    decoder->state = DECODER_STATE_ADDRESS;
+    return FUSAIN_DECODE_INCOMPLETE;
+
+  case DECODER_STATE_ADDRESS:
+    // Accumulate address bytes (little-endian)
+    packet->address |= ((uint64_t)byte) << (decoder->addr_byte_count * 8);
+    decoder->buffer[decoder->buffer_index++] = byte;
+    decoder->addr_byte_count++;
+    if (decoder->addr_byte_count >= 8) {
+      // All 8 address bytes received
+      decoder->state = DECODER_STATE_TYPE;
+    }
     return FUSAIN_DECODE_INCOMPLETE;
 
   case DECODER_STATE_TYPE:
@@ -176,9 +203,9 @@ fusain_decode_result_t fusain_decode_byte(uint8_t rx_byte,
     return FUSAIN_DECODE_INCOMPLETE;
 
   case DECODER_STATE_PAYLOAD:
-    packet->payload[decoder->buffer_index - 2] = byte;
+    packet->payload[decoder->buffer_index - 10] = byte; // -1 length -8 addr -1 type
     decoder->buffer[decoder->buffer_index++] = byte;
-    if (decoder->buffer_index >= packet->length + 2) {
+    if (decoder->buffer_index >= packet->length + 10) {
       // Payload complete, move to CRC
       decoder->state = DECODER_STATE_CRC1;
     }
@@ -200,8 +227,8 @@ fusain_decode_result_t fusain_decode_byte(uint8_t rx_byte,
       return FUSAIN_DECODE_INVALID_START;
     }
 
-    // Validate CRC
-    uint16_t calculated_crc = fusain_crc16(decoder->buffer, packet->length + 2);
+    // Validate CRC (LENGTH + ADDRESS + TYPE + PAYLOAD)
+    uint16_t calculated_crc = fusain_crc16(decoder->buffer, packet->length + 10);
     if (calculated_crc != packet->crc) {
       decoder->state = DECODER_STATE_IDLE;
       return FUSAIN_DECODE_INVALID_CRC;
@@ -223,54 +250,61 @@ void fusain_reset_decoder(fusain_decoder_t* decoder)
   decoder->state = DECODER_STATE_IDLE;
   decoder->buffer_index = 0;
   decoder->escape_next = false;
+  decoder->addr_byte_count = 0;
 }
 
 /* Helper Functions to Create Packets */
 
-void fusain_create_set_mode(fusain_packet_t* packet, fusain_mode_t mode,
-    uint32_t parameter)
+void fusain_create_set_mode(fusain_packet_t* packet, uint64_t address,
+    fusain_mode_t mode, uint32_t parameter)
 {
+  packet->address = address;
   fusain_cmd_set_mode_t cmd = { .mode = mode, .parameter = parameter };
   packet->length = sizeof(cmd);
   packet->msg_type = FUSAIN_MSG_STATE_COMMAND;
   memcpy(packet->payload, &cmd, sizeof(cmd));
 }
 
-void fusain_create_set_pump_rate(fusain_packet_t* packet, uint32_t rate_ms)
+void fusain_create_set_pump_rate(fusain_packet_t* packet, uint64_t address, uint32_t rate_ms)
 {
   fusain_cmd_set_pump_rate_t cmd = { .rate_ms = rate_ms };
+  packet->address = address;
   packet->length = sizeof(cmd);
   packet->msg_type = FUSAIN_MSG_PUMP_COMMAND;
   memcpy(packet->payload, &cmd, sizeof(cmd));
 }
 
-void fusain_create_set_target_rpm(fusain_packet_t* packet,
+void fusain_create_set_target_rpm(fusain_packet_t* packet, uint64_t address,
     uint32_t target_rpm)
 {
+  packet->address = address;
   fusain_cmd_set_target_rpm_t cmd = { .target_rpm = target_rpm };
   packet->length = sizeof(cmd);
   packet->msg_type = FUSAIN_MSG_MOTOR_COMMAND;
   memcpy(packet->payload, &cmd, sizeof(cmd));
 }
 
-void fusain_create_glow_command(fusain_packet_t* packet, int32_t glow,
+void fusain_create_glow_command(fusain_packet_t* packet, uint64_t address, int32_t glow,
     int32_t duration)
 {
+  packet->address = address;
   fusain_cmd_glow_t cmd = { .glow = glow, .duration = duration };
   packet->length = sizeof(cmd);
   packet->msg_type = FUSAIN_MSG_GLOW_COMMAND;
   memcpy(packet->payload, &cmd, sizeof(cmd));
 }
 
-void fusain_create_ping_request(fusain_packet_t* packet)
+void fusain_create_ping_request(fusain_packet_t* packet, uint64_t address)
 {
+  packet->address = address;
   packet->length = 0;
   packet->msg_type = FUSAIN_MSG_PING_REQUEST;
 }
 
-void fusain_create_telemetry_config(fusain_packet_t* packet, bool enabled,
+void fusain_create_telemetry_config(fusain_packet_t* packet, uint64_t address, bool enabled,
     uint32_t interval_ms, uint32_t mode)
 {
+  packet->address = address;
   fusain_cmd_telemetry_config_t cmd = { .telemetry_enabled = enabled ? 1 : 0,
     .interval_ms = interval_ms,
     .telemetry_mode = mode };
@@ -279,28 +313,32 @@ void fusain_create_telemetry_config(fusain_packet_t* packet, bool enabled,
   memcpy(packet->payload, &cmd, sizeof(cmd));
 }
 
-void fusain_create_state_data(fusain_packet_t* packet, fusain_state_t state,
-    fusain_error_t error)
+void fusain_create_state_data(fusain_packet_t* packet, uint64_t address,
+    fusain_state_t state, fusain_error_t error)
 {
+  packet->address = address;
   fusain_data_state_t data = { .state = state, .error = error };
   packet->length = sizeof(data);
   packet->msg_type = FUSAIN_MSG_STATE_DATA;
   memcpy(packet->payload, &data, sizeof(data));
 }
 
-void fusain_create_ping_response(fusain_packet_t* packet, uint64_t uptime_ms)
+void fusain_create_ping_response(fusain_packet_t* packet, uint64_t address,
+    uint64_t uptime_ms)
 {
+  packet->address = address;
   fusain_data_ping_response_t data = { .uptime_ms = uptime_ms };
   packet->length = sizeof(data);
   packet->msg_type = FUSAIN_MSG_PING_RESPONSE;
   memcpy(packet->payload, &data, sizeof(data));
 }
 
-int fusain_create_telemetry_bundle(
-    fusain_packet_t* packet, fusain_state_t state, fusain_error_t error,
+int fusain_create_telemetry_bundle(fusain_packet_t* packet, uint64_t address,
+    fusain_state_t state, fusain_error_t error,
     const fusain_telemetry_motor_t* motors, uint8_t motor_count,
     const fusain_telemetry_temperature_t* temperatures, uint8_t temp_count)
 {
+  packet->address = address;
   // Validate counts
   if (motor_count > FUSAIN_MAX_MOTORS || temp_count > FUSAIN_MAX_TEMPERATURES || motor_count == 0 || temp_count == 0) {
     return -1;
@@ -341,41 +379,46 @@ int fusain_create_telemetry_bundle(
 
 /* v2.0 Configuration Command Functions */
 
-void fusain_create_motor_config(fusain_packet_t* packet,
+void fusain_create_motor_config(fusain_packet_t* packet, uint64_t address,
     const fusain_cmd_motor_config_t* config)
 {
+  packet->address = address;
   packet->length = sizeof(fusain_cmd_motor_config_t);
   packet->msg_type = FUSAIN_MSG_MOTOR_CONFIG;
   memcpy(packet->payload, config, sizeof(fusain_cmd_motor_config_t));
 }
 
-void fusain_create_pump_config(fusain_packet_t* packet,
+void fusain_create_pump_config(fusain_packet_t* packet, uint64_t address,
     const fusain_cmd_pump_config_t* config)
 {
+  packet->address = address;
   packet->length = sizeof(fusain_cmd_pump_config_t);
   packet->msg_type = FUSAIN_MSG_PUMP_CONFIG;
   memcpy(packet->payload, config, sizeof(fusain_cmd_pump_config_t));
 }
 
-void fusain_create_temp_config(fusain_packet_t* packet,
+void fusain_create_temp_config(fusain_packet_t* packet, uint64_t address,
     const fusain_cmd_temp_config_t* config)
 {
+  packet->address = address;
   packet->length = sizeof(fusain_cmd_temp_config_t);
   packet->msg_type = FUSAIN_MSG_TEMP_CONFIG;
   memcpy(packet->payload, config, sizeof(fusain_cmd_temp_config_t));
 }
 
-void fusain_create_glow_config(fusain_packet_t* packet,
+void fusain_create_glow_config(fusain_packet_t* packet, uint64_t address,
     const fusain_cmd_glow_config_t* config)
 {
+  packet->address = address;
   packet->length = sizeof(fusain_cmd_glow_config_t);
   packet->msg_type = FUSAIN_MSG_GLOW_CONFIG;
   memcpy(packet->payload, config, sizeof(fusain_cmd_glow_config_t));
 }
 
-void fusain_create_data_subscription(fusain_packet_t* packet,
+void fusain_create_data_subscription(fusain_packet_t* packet, uint64_t address,
     uint64_t appliance_address, uint64_t message_filter)
 {
+  packet->address = address;
   fusain_cmd_data_subscription_t cmd = {
     .appliance_address = appliance_address,
     .message_filter = message_filter
@@ -385,9 +428,10 @@ void fusain_create_data_subscription(fusain_packet_t* packet,
   memcpy(packet->payload, &cmd, sizeof(cmd));
 }
 
-void fusain_create_data_unsubscribe(fusain_packet_t* packet,
+void fusain_create_data_unsubscribe(fusain_packet_t* packet, uint64_t address,
     uint64_t appliance_address)
 {
+  packet->address = address;
   fusain_cmd_data_unsubscribe_t cmd = {
     .appliance_address = appliance_address
   };
@@ -396,15 +440,17 @@ void fusain_create_data_unsubscribe(fusain_packet_t* packet,
   memcpy(packet->payload, &cmd, sizeof(cmd));
 }
 
-void fusain_create_discovery_request(fusain_packet_t* packet)
+void fusain_create_discovery_request(fusain_packet_t* packet, uint64_t address)
 {
+  packet->address = address;
   packet->length = 0;
   packet->msg_type = FUSAIN_MSG_DISCOVERY_REQUEST;
 }
 
-void fusain_create_device_announce(fusain_packet_t* packet,
+void fusain_create_device_announce(fusain_packet_t* packet, uint64_t address,
     uint32_t device_type, uint32_t capabilities)
 {
+  packet->address = address;
   fusain_data_device_announce_t data = {
     .device_type = device_type,
     .capabilities = capabilities

@@ -13,7 +13,7 @@
 ZTEST(fusain_packets, test_create_set_mode)
 {
   fusain_packet_t packet;
-  fusain_create_set_mode(&packet, FUSAIN_MODE_HEAT, 2500);
+  fusain_create_set_mode(&packet, 0, FUSAIN_MODE_HEAT, 2500);
 
   zassert_equal(packet.msg_type, FUSAIN_MSG_STATE_COMMAND, "Type should match");
   zassert_equal(packet.length, sizeof(fusain_cmd_set_mode_t),
@@ -27,7 +27,7 @@ ZTEST(fusain_packets, test_create_set_mode)
 ZTEST(fusain_packets, test_create_set_pump_rate)
 {
   fusain_packet_t packet;
-  fusain_create_set_pump_rate(&packet, 250);
+  fusain_create_set_pump_rate(&packet, 0, 250);
 
   zassert_equal(packet.msg_type, FUSAIN_MSG_PUMP_COMMAND, "Type should match");
   zassert_equal(packet.length, sizeof(fusain_cmd_set_pump_rate_t),
@@ -40,7 +40,7 @@ ZTEST(fusain_packets, test_create_set_pump_rate)
 ZTEST(fusain_packets, test_create_set_target_rpm)
 {
   fusain_packet_t packet;
-  fusain_create_set_target_rpm(&packet, 3000);
+  fusain_create_set_target_rpm(&packet, 0, 3000);
 
   zassert_equal(packet.msg_type, FUSAIN_MSG_MOTOR_COMMAND, "Type should match");
   zassert_equal(packet.length, sizeof(fusain_cmd_set_target_rpm_t),
@@ -53,7 +53,7 @@ ZTEST(fusain_packets, test_create_set_target_rpm)
 ZTEST(fusain_packets, test_create_glow_command)
 {
   fusain_packet_t packet;
-  fusain_create_glow_command(&packet, 0, 30000);
+  fusain_create_glow_command(&packet, 0, 0, 30000);
 
   zassert_equal(packet.msg_type, FUSAIN_MSG_GLOW_COMMAND, "Type should match");
   zassert_equal(packet.length, sizeof(fusain_cmd_glow_t), "Length should match");
@@ -66,7 +66,7 @@ ZTEST(fusain_packets, test_create_glow_command)
 ZTEST(fusain_packets, test_create_ping_request)
 {
   fusain_packet_t packet;
-  fusain_create_ping_request(&packet);
+  fusain_create_ping_request(&packet, 0);
 
   zassert_equal(packet.msg_type, FUSAIN_MSG_PING_REQUEST, "Type should match");
   zassert_equal(packet.length, 0, "Ping should have no payload");
@@ -75,7 +75,7 @@ ZTEST(fusain_packets, test_create_ping_request)
 ZTEST(fusain_packets, test_create_telemetry_config)
 {
   fusain_packet_t packet;
-  fusain_create_telemetry_config(&packet, true, 100, 0);
+  fusain_create_telemetry_config(&packet, 0, true, 100, 0);
 
   zassert_equal(packet.msg_type, FUSAIN_MSG_TELEMETRY_CONFIG,
       "Type should match");
@@ -103,7 +103,7 @@ ZTEST(fusain_packets, test_create_motor_config)
   };
 
   fusain_packet_t packet;
-  fusain_create_motor_config(&packet, &config);
+  fusain_create_motor_config(&packet, 0, &config);
 
   zassert_equal(packet.msg_type, FUSAIN_MSG_MOTOR_CONFIG, "Type should match");
   zassert_equal(packet.length, sizeof(fusain_cmd_motor_config_t),
@@ -123,7 +123,7 @@ ZTEST(fusain_packets, test_create_pump_config)
   };
 
   fusain_packet_t packet;
-  fusain_create_pump_config(&packet, &config);
+  fusain_create_pump_config(&packet, 0, &config);
 
   zassert_equal(packet.msg_type, FUSAIN_MSG_PUMP_CONFIG, "Type should match");
   zassert_equal(packet.length, sizeof(fusain_cmd_pump_config_t),
@@ -142,7 +142,7 @@ ZTEST(fusain_packets, test_create_temp_config)
   };
 
   fusain_packet_t packet;
-  fusain_create_temp_config(&packet, &config);
+  fusain_create_temp_config(&packet, 0, &config);
 
   zassert_equal(packet.msg_type, FUSAIN_MSG_TEMP_CONFIG, "Type should match");
   zassert_equal(packet.length, sizeof(fusain_cmd_temp_config_t),
@@ -157,7 +157,7 @@ ZTEST(fusain_packets, test_create_glow_config)
   };
 
   fusain_packet_t packet;
-  fusain_create_glow_config(&packet, &config);
+  fusain_create_glow_config(&packet, 0, &config);
 
   zassert_equal(packet.msg_type, FUSAIN_MSG_GLOW_CONFIG, "Type should match");
   zassert_equal(packet.length, sizeof(fusain_cmd_glow_config_t),
@@ -167,7 +167,7 @@ ZTEST(fusain_packets, test_create_glow_config)
 ZTEST(fusain_packets, test_create_data_subscription)
 {
   fusain_packet_t packet;
-  fusain_create_data_subscription(&packet, 0x123456789ABCDEF0ULL, 0xFFULL);
+  fusain_create_data_subscription(&packet, 0, 0x123456789ABCDEF0ULL, 0xFFULL);
 
   zassert_equal(packet.msg_type, FUSAIN_MSG_DATA_SUBSCRIPTION,
       "Type should match");
@@ -183,7 +183,7 @@ ZTEST(fusain_packets, test_create_data_subscription)
 ZTEST(fusain_packets, test_create_data_unsubscribe)
 {
   fusain_packet_t packet;
-  fusain_create_data_unsubscribe(&packet, 0x123456789ABCDEF0ULL);
+  fusain_create_data_unsubscribe(&packet, 0, 0x123456789ABCDEF0ULL);
 
   zassert_equal(packet.msg_type, FUSAIN_MSG_DATA_UNSUBSCRIBE,
       "Type should match");
@@ -194,7 +194,7 @@ ZTEST(fusain_packets, test_create_data_unsubscribe)
 ZTEST(fusain_packets, test_create_discovery_request)
 {
   fusain_packet_t packet;
-  fusain_create_discovery_request(&packet);
+  fusain_create_discovery_request(&packet, 0);
 
   zassert_equal(packet.msg_type, FUSAIN_MSG_DISCOVERY_REQUEST,
       "Type should match");
@@ -205,7 +205,7 @@ ZTEST(fusain_packets, test_create_discovery_request)
 ZTEST(fusain_packets, test_create_state_data)
 {
   fusain_packet_t packet;
-  fusain_create_state_data(&packet, FUSAIN_STATE_HEATING, FUSAIN_ERROR_NONE);
+  fusain_create_state_data(&packet, 0, FUSAIN_STATE_HEATING, FUSAIN_ERROR_NONE);
 
   zassert_equal(packet.msg_type, FUSAIN_MSG_STATE_DATA, "Type should match");
   zassert_equal(packet.length, sizeof(fusain_data_state_t),
@@ -219,7 +219,7 @@ ZTEST(fusain_packets, test_create_state_data)
 ZTEST(fusain_packets, test_create_ping_response)
 {
   fusain_packet_t packet;
-  fusain_create_ping_response(&packet, 123456789ULL);
+  fusain_create_ping_response(&packet, 0, 123456789ULL);
 
   zassert_equal(packet.msg_type, FUSAIN_MSG_PING_RESPONSE, "Type should match");
   zassert_equal(packet.length, sizeof(fusain_data_ping_response_t),
@@ -232,7 +232,7 @@ ZTEST(fusain_packets, test_create_ping_response)
 ZTEST(fusain_packets, test_create_device_announce)
 {
   fusain_packet_t packet;
-  fusain_create_device_announce(&packet, 0x01, 0xFF);
+  fusain_create_device_announce(&packet, 0, 0x01, 0xFF);
 
   zassert_equal(packet.msg_type, FUSAIN_MSG_DEVICE_ANNOUNCE,
       "Type should match");
@@ -256,7 +256,7 @@ ZTEST(fusain_packets, test_create_telemetry_bundle)
   };
 
   fusain_packet_t packet;
-  int ret = fusain_create_telemetry_bundle(&packet, FUSAIN_STATE_HEATING,
+  int ret = fusain_create_telemetry_bundle(&packet, 0, FUSAIN_STATE_HEATING,
       FUSAIN_ERROR_NONE, motors, 2, temps, 1);
 
   zassert_equal(ret, 0, "Bundle creation should succeed");
@@ -285,20 +285,20 @@ ZTEST(fusain_packets, test_packet_roundtrip)
     /* Create different packet types */
     switch (test_idx) {
     case 0:
-      fusain_create_ping_request(&tx_packet);
+      fusain_create_ping_request(&tx_packet, 0);
       break;
     case 1:
-      fusain_create_set_mode(&tx_packet, FUSAIN_MODE_HEAT, 2500);
+      fusain_create_set_mode(&tx_packet, 0, FUSAIN_MODE_HEAT, 2500);
       break;
     case 2:
-      fusain_create_state_data(&tx_packet, FUSAIN_STATE_HEATING,
+      fusain_create_state_data(&tx_packet, 0, FUSAIN_STATE_HEATING,
           FUSAIN_ERROR_NONE);
       break;
     case 3:
-      fusain_create_discovery_request(&tx_packet);
+      fusain_create_discovery_request(&tx_packet, 0);
       break;
     case 4:
-      fusain_create_device_announce(&tx_packet, 1, 0xFF);
+      fusain_create_device_announce(&tx_packet, 0, 1, 0xFF);
       break;
     }
 

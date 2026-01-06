@@ -23,7 +23,7 @@
 
 #define FUSAIN_MAX_PACKET_SIZE 128
 #define FUSAIN_MAX_PAYLOAD_SIZE 114
-#define FUSAIN_MIN_PACKET_SIZE 6 // START + LEN + TYPE + CRC(2) + END
+#define FUSAIN_MIN_PACKET_SIZE 14 // START + LEN + ADDR(8) + TYPE + CRC(2) + END
 
 /* Message Type Definitions */
 typedef enum {
@@ -249,7 +249,8 @@ typedef struct __attribute__((packed)) {
 /* Packet Structure */
 typedef struct {
   uint8_t start; // FUSAIN_START_BYTE
-  uint8_t length; // Payload length (0-58)
+  uint8_t length; // Payload length (0-114)
+  uint64_t address; // Device address
   uint8_t msg_type; // fusain_msg_type_t
   uint8_t payload[FUSAIN_MAX_PAYLOAD_SIZE];
   uint16_t crc; // CRC-16-CCITT
@@ -272,6 +273,7 @@ typedef struct {
   uint8_t buffer[FUSAIN_MAX_PACKET_SIZE]; // Internal decode buffer
   size_t buffer_index; // Current position in buffer
   bool escape_next; // Escape sequence flag
+  uint8_t addr_byte_count; // Number of address bytes received (0-8)
 } fusain_decoder_t;
 
 /* Function Declarations */
@@ -322,36 +324,42 @@ void fusain_reset_decoder(fusain_decoder_t* decoder);
  * Create a SET_MODE command packet
  *
  * @param packet Output packet
+ * @param address Device address
  * @param mode Operating mode
  * @param parameter Mode parameter (RPM for FAN mode)
  */
-void fusain_create_set_mode(fusain_packet_t* packet, fusain_mode_t mode,
-    uint32_t parameter);
+void fusain_create_set_mode(fusain_packet_t* packet, uint64_t address,
+    fusain_mode_t mode, uint32_t parameter);
 
 /**
  * Create a SET_PUMP_RATE command packet
  *
  * @param packet Output packet
+ * @param address Device address
  * @param rate_ms Pump rate in milliseconds
  */
-void fusain_create_set_pump_rate(fusain_packet_t* packet, uint32_t rate_ms);
+void fusain_create_set_pump_rate(fusain_packet_t* packet, uint64_t address,
+    uint32_t rate_ms);
 
 /**
  * Create a SET_TARGET_RPM command packet
  *
  * @param packet Output packet
+ * @param address Device address
  * @param target_rpm Target RPM
  */
-void fusain_create_set_target_rpm(fusain_packet_t* packet, uint32_t target_rpm);
+void fusain_create_set_target_rpm(fusain_packet_t* packet, uint64_t address,
+    uint32_t target_rpm);
 
 /**
  * Create a GLOW_COMMAND packet
  *
  * @param packet Output packet
+ * @param address Device address
  * @param glow Glow plug index (0-9, typically 0)
  * @param duration Burn duration in milliseconds (0-300000)
  */
-void fusain_create_glow_command(fusain_packet_t* packet, int32_t glow,
+void fusain_create_glow_command(fusain_packet_t* packet, uint64_t address, int32_t glow,
     int32_t duration);
 
 /**
@@ -359,17 +367,18 @@ void fusain_create_glow_command(fusain_packet_t* packet, int32_t glow,
  *
  * @param packet Output packet
  */
-void fusain_create_ping_request(fusain_packet_t* packet);
+void fusain_create_ping_request(fusain_packet_t* packet, uint64_t address);
 
 /**
  * Create a TELEMETRY_CONFIG packet
  *
  * @param packet Output packet
+ * @param address Device address
  * @param enabled Telemetry broadcast enabled (0=disabled, 1=enabled)
  * @param interval_ms Telemetry broadcast interval (100-5000 ms)
  * @param mode Telemetry mode (0=bundled, 1=individual)
  */
-void fusain_create_telemetry_config(fusain_packet_t* packet, bool enabled,
+void fusain_create_telemetry_config(fusain_packet_t* packet, uint64_t address, bool enabled,
     uint32_t interval_ms, uint32_t mode);
 
 /**
@@ -378,7 +387,7 @@ void fusain_create_telemetry_config(fusain_packet_t* packet, bool enabled,
  * @param packet Output packet
  * @param config Motor configuration parameters
  */
-void fusain_create_motor_config(fusain_packet_t* packet,
+void fusain_create_motor_config(fusain_packet_t* packet, uint64_t address,
     const fusain_cmd_motor_config_t* config);
 
 /**
@@ -387,7 +396,7 @@ void fusain_create_motor_config(fusain_packet_t* packet,
  * @param packet Output packet
  * @param config Pump configuration parameters
  */
-void fusain_create_pump_config(fusain_packet_t* packet,
+void fusain_create_pump_config(fusain_packet_t* packet, uint64_t address,
     const fusain_cmd_pump_config_t* config);
 
 /**
@@ -396,7 +405,7 @@ void fusain_create_pump_config(fusain_packet_t* packet,
  * @param packet Output packet
  * @param config Temperature configuration parameters
  */
-void fusain_create_temp_config(fusain_packet_t* packet,
+void fusain_create_temp_config(fusain_packet_t* packet, uint64_t address,
     const fusain_cmd_temp_config_t* config);
 
 /**
@@ -405,7 +414,7 @@ void fusain_create_temp_config(fusain_packet_t* packet,
  * @param packet Output packet
  * @param config Glow plug configuration parameters
  */
-void fusain_create_glow_config(fusain_packet_t* packet,
+void fusain_create_glow_config(fusain_packet_t* packet, uint64_t address,
     const fusain_cmd_glow_config_t* config);
 
 /**
@@ -415,7 +424,7 @@ void fusain_create_glow_config(fusain_packet_t* packet,
  * @param appliance_address Address of appliance to subscribe to
  * @param message_filter Message type filter bitmask
  */
-void fusain_create_data_subscription(fusain_packet_t* packet,
+void fusain_create_data_subscription(fusain_packet_t* packet, uint64_t address,
     uint64_t appliance_address, uint64_t message_filter);
 
 /**
@@ -424,7 +433,7 @@ void fusain_create_data_subscription(fusain_packet_t* packet,
  * @param packet Output packet
  * @param appliance_address Address of appliance to unsubscribe from
  */
-void fusain_create_data_unsubscribe(fusain_packet_t* packet,
+void fusain_create_data_unsubscribe(fusain_packet_t* packet, uint64_t address,
     uint64_t appliance_address);
 
 /**
@@ -432,16 +441,17 @@ void fusain_create_data_unsubscribe(fusain_packet_t* packet,
  *
  * @param packet Output packet
  */
-void fusain_create_discovery_request(fusain_packet_t* packet);
+void fusain_create_discovery_request(fusain_packet_t* packet, uint64_t address);
 
 /**
  * Create a STATE_DATA packet
  *
  * @param packet Output packet
+ * @param address Device address
  * @param state Current state
  * @param error Error code
  */
-void fusain_create_state_data(fusain_packet_t* packet, fusain_state_t state,
+void fusain_create_state_data(fusain_packet_t* packet, uint64_t address, fusain_state_t state,
     fusain_error_t error);
 
 /**
@@ -450,12 +460,13 @@ void fusain_create_state_data(fusain_packet_t* packet, fusain_state_t state,
  * @param packet Output packet
  * @param uptime_ms System uptime in milliseconds
  */
-void fusain_create_ping_response(fusain_packet_t* packet, uint64_t uptime_ms);
+void fusain_create_ping_response(fusain_packet_t* packet, uint64_t address, uint64_t uptime_ms);
 
 /**
  * Create a TELEMETRY_BUNDLE packet
  *
  * @param packet Output packet
+ * @param address Device address
  * @param state Current state
  * @param error Error code
  * @param motors Array of motor data
@@ -464,7 +475,7 @@ void fusain_create_ping_response(fusain_packet_t* packet, uint64_t uptime_ms);
  * @param temp_count Number of temperatures (1-4)
  * @return 0 on success, negative on error
  */
-int fusain_create_telemetry_bundle(fusain_packet_t* packet,
+int fusain_create_telemetry_bundle(fusain_packet_t* packet, uint64_t address,
     fusain_state_t state, fusain_error_t error,
     const fusain_telemetry_motor_t* motors,
     uint8_t motor_count,
@@ -475,10 +486,11 @@ int fusain_create_telemetry_bundle(fusain_packet_t* packet,
  * Create a DEVICE_ANNOUNCE packet (v2.0)
  *
  * @param packet Output packet
+ * @param address Device address
  * @param device_type Device type identifier
  * @param capabilities Capabilities bitmask
  */
-void fusain_create_device_announce(fusain_packet_t* packet,
+void fusain_create_device_announce(fusain_packet_t* packet, uint64_t address,
     uint32_t device_type, uint32_t capabilities);
 
 /**
