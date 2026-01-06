@@ -1,0 +1,156 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+env:
+  BOARD: native_sim
+
+tasks:
+  build-firmware:
+    desc: Build the Fusain library for native_sim
+    cmd: west build -b native_sim
+
+  rebuild-firmware:
+    desc: Rebuild the Fusain library from scratch
+    cmd: west build -b native_sim -p always
+
+  clean:
+    desc: Clean build artifacts
+    cmd: rm -rf build
+
+  auto-build:
+    desc: Build the Fusain library automatically when files are saved
+    watch: true
+    sources:
+      - src/**
+      - include/**
+      - CMakeLists.txt
+      - Kconfig
+    cmd: west build -b native_sim
+
+  menuconfig:
+    desc: Start menuconfig to configure the Fusain library
+    cmds:
+      - west build -b native_sim -t menuconfig
+      - task: build-firmware
+
+  config-diff:
+    desc: Display Zephyr's Kconfig diff
+    ignore_error: true
+    cmd: diff --color build/zephyr/.config.old build/zephyr/.config
+
+  test:
+    desc: Run Fusain test suite with optional fuzz round count (e.g., 'task test -- 420')
+    vars:
+      ROUNDS: '{{default "100" .CLI_ARGS}}'
+    cmds:
+      - |
+        if [ -n "{{.CLI_ARGS}}" ]; then
+          rm -rf twister-out twister-out.*
+          west twister -T tests -x CONFIG_FUSAIN_TEST_FUZZ_ROUNDS={{.ROUNDS}} --enable-slow -v
+        else
+          west twister -T tests --enable-slow -v
+        fi
+        TEST_EXIT=$?
+        if [ $TEST_EXIT -eq 0 ]; then
+          echo "Tests passed - cleaning up artifacts"
+          rm -rf twister-out twister-out.*
+        else
+          echo "Tests failed - preserving artifacts for debugging"
+          exit $TEST_EXIT
+        fi
+
+  test-functional:
+    desc: Run only functional tests (no fuzzing, no round count)
+    cmds:
+      - |
+        west twister -T tests -s libraries.fusain.functional -v
+        TEST_EXIT=$?
+        if [ $TEST_EXIT -eq 0 ]; then
+          echo "Tests passed - cleaning up artifacts"
+          rm -rf twister-out twister-out.*
+        else
+          echo "Tests failed - preserving artifacts for debugging"
+          exit $TEST_EXIT
+        fi
+
+  test-fuzz:
+    desc: Run only fuzz tests with optional round count (e.g., 'task test-fuzz -- 5000')
+    vars:
+      ROUNDS: '{{default "1000" .CLI_ARGS}}'
+    cmds:
+      - |
+        if [ -n "{{.CLI_ARGS}}" ]; then
+          rm -rf twister-out twister-out.*
+          west twister -T tests -s libraries.fusain.fuzz -x CONFIG_FUSAIN_TEST_FUZZ_ROUNDS={{.ROUNDS}} --enable-slow -v
+        else
+          west twister -T tests -s libraries.fusain.fuzz --enable-slow -v
+        fi
+        TEST_EXIT=$?
+        if [ $TEST_EXIT -eq 0 ]; then
+          echo "Tests passed - cleaning up artifacts"
+          rm -rf twister-out twister-out.*
+        else
+          echo "Tests failed - preserving artifacts for debugging"
+          exit $TEST_EXIT
+        fi
+
+  format:
+    desc: Format C source files using clang-format
+    cmds:
+      - clang-format -i src/*.c include/fusain/*.h tests/src/*.c
+
+  format-check:
+    desc: Check if C source files are formatted correctly
+    cmds:
+      - |
+        RESULT=$(clang-format --dry-run --Werror src/*.c include/fusain/*.h tests/src/*.c 2>&1)
+        if [ $? -ne 0 ]; then
+          echo "Formatting issues found:"
+          echo "$RESULT"
+          echo ""
+          echo "Run 'task format' to fix formatting issues."
+          exit 1
+        else
+          echo "All files are correctly formatted."
+        fi
+
+  ci:
+    desc: Run CI checks - format check and test suite with 1,000,000 fuzz rounds
+    cmds:
+      - echo "Running CI checks..."
+      - echo ""
+      - task: format-check
+      - echo ""
+      - echo "Running test suite with 1,000,000 fuzz rounds..."
+      - echo "This will take several minutes. Please be patient."
+      - task: test
+        vars:
+          CLI_ARGS: "1000000"
+
+  install-git-hooks:
+    desc: Install pre-commit hook that runs CI tests
+    cmds:
+      - |
+        if [ ! -d ".git" ]; then
+          echo "Error: Not in a git repository. Run this from the fusain directory."
+          exit 1
+        fi
+
+        if [ ! -f "git-hooks/pre-commit" ]; then
+          echo "Error: git-hooks/pre-commit not found."
+          exit 1
+        fi
+
+        mkdir -p .git/hooks
+        cp git-hooks/pre-commit .git/hooks/pre-commit
+        chmod +x .git/hooks/pre-commit
+
+        echo "✓ Pre-commit hook installed at .git/hooks/pre-commit"
+        echo ""
+        echo "The hook will run on every commit and check:"
+        echo "  1. Code formatting (fast)"
+        echo "  2. CI test suite with 1,000,000 fuzz rounds (slow)"
+        echo ""
+        echo "To skip the hook for a commit, use: git commit --no-verify"
+        echo "To uninstall: rm .git/hooks/pre-commit"

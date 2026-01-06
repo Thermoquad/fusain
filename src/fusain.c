@@ -339,6 +339,81 @@ int helios_create_telemetry_bundle(
   return 0;
 }
 
+/* v2.0 Configuration Command Functions */
+
+void helios_create_motor_config(helios_packet_t* packet,
+    const helios_cmd_motor_config_t* config)
+{
+  packet->length = sizeof(helios_cmd_motor_config_t);
+  packet->msg_type = HELIOS_MSG_MOTOR_CONFIG;
+  memcpy(packet->payload, config, sizeof(helios_cmd_motor_config_t));
+}
+
+void helios_create_pump_config(helios_packet_t* packet,
+    const helios_cmd_pump_config_t* config)
+{
+  packet->length = sizeof(helios_cmd_pump_config_t);
+  packet->msg_type = HELIOS_MSG_PUMP_CONFIG;
+  memcpy(packet->payload, config, sizeof(helios_cmd_pump_config_t));
+}
+
+void helios_create_temp_config(helios_packet_t* packet,
+    const helios_cmd_temp_config_t* config)
+{
+  packet->length = sizeof(helios_cmd_temp_config_t);
+  packet->msg_type = HELIOS_MSG_TEMP_CONFIG;
+  memcpy(packet->payload, config, sizeof(helios_cmd_temp_config_t));
+}
+
+void helios_create_glow_config(helios_packet_t* packet,
+    const helios_cmd_glow_config_t* config)
+{
+  packet->length = sizeof(helios_cmd_glow_config_t);
+  packet->msg_type = HELIOS_MSG_GLOW_CONFIG;
+  memcpy(packet->payload, config, sizeof(helios_cmd_glow_config_t));
+}
+
+void helios_create_data_subscription(helios_packet_t* packet,
+    uint64_t appliance_address, uint64_t message_filter)
+{
+  helios_cmd_data_subscription_t cmd = {
+    .appliance_address = appliance_address,
+    .message_filter = message_filter
+  };
+  packet->length = sizeof(cmd);
+  packet->msg_type = HELIOS_MSG_DATA_SUBSCRIPTION;
+  memcpy(packet->payload, &cmd, sizeof(cmd));
+}
+
+void helios_create_data_unsubscription(helios_packet_t* packet,
+    uint64_t appliance_address)
+{
+  helios_cmd_data_unsubscription_t cmd = {
+    .appliance_address = appliance_address
+  };
+  packet->length = sizeof(cmd);
+  packet->msg_type = HELIOS_MSG_DATA_UNSUBSCRIPTION;
+  memcpy(packet->payload, &cmd, sizeof(cmd));
+}
+
+void helios_create_discovery_request(helios_packet_t* packet)
+{
+  packet->length = 0;
+  packet->msg_type = HELIOS_MSG_DISCOVERY_REQUEST;
+}
+
+void helios_create_device_announce(helios_packet_t* packet,
+    uint32_t device_type, uint32_t capabilities)
+{
+  helios_data_device_announce_t data = {
+    .device_type = device_type,
+    .capabilities = capabilities
+  };
+  packet->length = sizeof(data);
+  packet->msg_type = HELIOS_MSG_DEVICE_ANNOUNCE;
+  memcpy(packet->payload, &data, sizeof(data));
+}
+
 /**
  * Human-readable names for helios_mode_t values
  *

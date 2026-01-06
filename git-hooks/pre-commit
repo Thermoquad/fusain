@@ -1,0 +1,39 @@
+#!/bin/bash
+# Fusain pre-commit hook - runs CI test suite
+# Copyright (c) 2025 Kaz Walker, Thermoquad
+# SPDX-License-Identifier: Apache-2.0
+#
+# This hook is installed by running: task install-git-hooks
+
+set -e
+
+echo "Running pre-commit checks..."
+echo ""
+
+# Check formatting first (fast)
+echo "1. Checking code formatting..."
+if ! task format-check; then
+  echo ""
+  echo "Pre-commit failed - Code formatting issues detected"
+  echo "Run 'task format' to fix formatting issues, then try committing again."
+  exit 1
+fi
+
+echo "✓ Code formatting OK"
+echo ""
+
+# Run CI tests (slow but thorough)
+echo "2. Running CI test suite (1,000,000 fuzz rounds)..."
+echo "   This will take several minutes..."
+if ! task ci; then
+  echo ""
+  echo "Pre-commit failed - CI tests failed"
+  echo "Fix the test failures, then try committing again."
+  exit 1
+fi
+
+echo "✓ CI tests passed"
+echo ""
+echo "✅ All pre-commit checks passed!"
+
+exit 0

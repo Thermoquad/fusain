@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+
+tests:
+  libraries.fusain.functional:
+    tags:
+      - fusain
+      - protocol
+      - functional
+    platform_allow:
+      - native_sim
+    integration_platforms:
+      - native_sim
+    harness: ztest
+    timeout: 60
+
+  libraries.fusain.fuzz:
+    tags:
+      - fusain
+      - protocol
+      - fuzz
+    slow: true
+    platform_allow:
+      - native_sim
+    integration_platforms:
+      - native_sim
+    harness: ztest
+    timeout: 120

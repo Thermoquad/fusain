@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config FUSAIN_TEST_FUZZ_ROUNDS
+	int "Number of fuzz test rounds"
+	default 100
+	help
+	  Number of fuzzing iterations with random values.
+	  Higher values increase coverage of edge cases.
+	  Functional tests use fixed test cases and do not use this config.
+
+source "Kconfig.zephyr"

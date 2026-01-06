@@ -22,34 +22,44 @@
 #define HELIOS_ESC_XOR 0x20
 
 #define HELIOS_MAX_PACKET_SIZE 128
-#define HELIOS_MAX_PAYLOAD_SIZE 122
+#define HELIOS_MAX_PAYLOAD_SIZE 114
 #define HELIOS_MIN_PACKET_SIZE 6 // START + LEN + TYPE + CRC(2) + END
 
 /* Message Type Definitions */
 typedef enum {
-  /* Command Messages (Master → ICU) */
-  HELIOS_MSG_STATE_COMMAND = 0x10,
-  HELIOS_MSG_MOTOR_COMMAND = 0x11,
-  HELIOS_MSG_PUMP_COMMAND = 0x12,
-  HELIOS_MSG_GLOW_COMMAND = 0x13,
-  HELIOS_MSG_TEMP_COMMAND = 0x14,
+  /* Configuration Commands (Controller → Appliance) 0x10-0x1F */
+  HELIOS_MSG_MOTOR_CONFIG = 0x10,
+  HELIOS_MSG_PUMP_CONFIG = 0x11,
+  HELIOS_MSG_TEMP_CONFIG = 0x12,
+  HELIOS_MSG_GLOW_CONFIG = 0x13,
+  HELIOS_MSG_DATA_SUBSCRIPTION = 0x14,
+  HELIOS_MSG_DATA_UNSUBSCRIPTION = 0x15,
   HELIOS_MSG_TELEMETRY_CONFIG = 0x16,
-  HELIOS_MSG_PING_REQUEST = 0x1F,
+  HELIOS_MSG_DISCOVERY_REQUEST = 0x1F,
 
-  /* Data Messages (ICU → Master) */
-  HELIOS_MSG_STATE_DATA = 0x20,
-  HELIOS_MSG_MOTOR_DATA = 0x21,
-  HELIOS_MSG_TEMPERATURE_DATA = 0x22,
-  HELIOS_MSG_PUMP_DATA = 0x23,
-  HELIOS_MSG_GLOW_DATA = 0x24,
-  HELIOS_MSG_TELEMETRY_BUNDLE = 0x25,
-  HELIOS_MSG_PING_RESPONSE = 0x26,
+  /* Control Commands (Controller → Appliance) 0x20-0x2F */
+  HELIOS_MSG_STATE_COMMAND = 0x20,
+  HELIOS_MSG_MOTOR_COMMAND = 0x21,
+  HELIOS_MSG_PUMP_COMMAND = 0x22,
+  HELIOS_MSG_GLOW_COMMAND = 0x23,
+  HELIOS_MSG_TEMP_COMMAND = 0x24,
+  HELIOS_MSG_PING_REQUEST = 0x2F,
 
-  /* Error Messages (Bidirectional) */
-  HELIOS_MSG_ERROR_INVALID_COMMAND = 0xE0,
-  HELIOS_MSG_ERROR_INVALID_CRC = 0xE1,
-  HELIOS_MSG_ERROR_INVALID_LENGTH = 0xE2,
-  HELIOS_MSG_ERROR_TIMEOUT = 0xE3,
+  /* Telemetry Data (Appliance → Controller) 0x30-0x3F */
+  HELIOS_MSG_STATE_DATA = 0x30,
+  HELIOS_MSG_MOTOR_DATA = 0x31,
+  HELIOS_MSG_PUMP_DATA = 0x32,
+  HELIOS_MSG_GLOW_DATA = 0x33,
+  HELIOS_MSG_TEMP_DATA = 0x34,
+  HELIOS_MSG_TELEMETRY_BUNDLE = 0x35,
+  HELIOS_MSG_DEVICE_ANNOUNCE = 0x36,
+  HELIOS_MSG_PING_RESPONSE = 0x3F,
+
+  /* Error Messages (Bidirectional) 0xE0-0xEF */
+  HELIOS_MSG_ERROR_INVALID_MSG = 0xE0,
+  HELIOS_MSG_ERROR_CRC_FAIL = 0xE1,
+  HELIOS_MSG_ERROR_INVALID_CMD = 0xE2,
+  HELIOS_MSG_ERROR_STATE_REJECT = 0xE3,
 } helios_msg_type_t;
 
 /* Operating Modes */
@@ -98,8 +108,8 @@ typedef struct __attribute__((packed)) {
 } helios_cmd_set_target_rpm_t;
 
 typedef struct __attribute__((packed)) {
-  int32_t glow;      // Glow plug index (0-9, typically 0)
-  int32_t duration;  // Burn duration in milliseconds (0-300000)
+  int32_t glow; // Glow plug index (0-9, typically 0)
+  int32_t duration; // Burn duration in milliseconds (0-300000)
 } helios_cmd_glow_t;
 
 typedef struct __attribute__((packed)) {
@@ -107,6 +117,51 @@ typedef struct __attribute__((packed)) {
   uint32_t interval_ms; // Telemetry broadcast interval (100-5000 ms)
   uint32_t telemetry_mode; // 0 = bundled, 1 = individual
 } helios_cmd_telemetry_config_t;
+
+/* Configuration Command Payloads (v2.0) */
+typedef struct __attribute__((packed)) {
+  int32_t motor;
+  uint32_t pwm_period;
+  double pid_kp;
+  double pid_ki;
+  double pid_kd;
+  int32_t max_rpm;
+  int32_t min_rpm;
+  uint32_t min_pwm_duty;
+  uint8_t padding[4];
+} helios_cmd_motor_config_t;
+
+typedef struct __attribute__((packed)) {
+  int32_t pump;
+  uint32_t min_rate_ms;
+  uint32_t max_rate_ms;
+  uint8_t padding[4];
+} helios_cmd_pump_config_t;
+
+typedef struct __attribute__((packed)) {
+  int32_t thermometer;
+  double pid_kp;
+  double pid_ki;
+  double pid_kd;
+  uint32_t sample_count;
+  uint32_t read_rate;
+  uint8_t padding[12];
+} helios_cmd_temp_config_t;
+
+typedef struct __attribute__((packed)) {
+  int32_t glow;
+  uint32_t max_duration_ms;
+  uint8_t padding[8];
+} helios_cmd_glow_config_t;
+
+typedef struct __attribute__((packed)) {
+  uint64_t appliance_address;
+  uint64_t message_filter;
+} helios_cmd_data_subscription_t;
+
+typedef struct __attribute__((packed)) {
+  uint64_t appliance_address;
+} helios_cmd_data_unsubscription_t;
 
 /* Data Payloads */
 typedef struct __attribute__((packed)) {
@@ -146,9 +201,14 @@ typedef struct __attribute__((packed)) {
   uint64_t uptime_ms;
 } helios_data_ping_response_t;
 
+typedef struct __attribute__((packed)) {
+  uint32_t device_type;
+  uint32_t capabilities;
+} helios_data_device_announce_t;
+
 /* Variable-length telemetry bundle */
-#define HELIOS_MAX_MOTORS 3
-#define HELIOS_MAX_TEMPERATURES 3
+#define HELIOS_MAX_MOTORS 5
+#define HELIOS_MAX_TEMPERATURES 4
 
 typedef struct __attribute__((packed)) {
   int32_t rpm;
@@ -313,6 +373,68 @@ void helios_create_telemetry_config(helios_packet_t* packet, bool enabled,
     uint32_t interval_ms, uint32_t mode);
 
 /**
+ * Create a MOTOR_CONFIG packet (v2.0)
+ *
+ * @param packet Output packet
+ * @param config Motor configuration parameters
+ */
+void helios_create_motor_config(helios_packet_t* packet,
+    const helios_cmd_motor_config_t* config);
+
+/**
+ * Create a PUMP_CONFIG packet (v2.0)
+ *
+ * @param packet Output packet
+ * @param config Pump configuration parameters
+ */
+void helios_create_pump_config(helios_packet_t* packet,
+    const helios_cmd_pump_config_t* config);
+
+/**
+ * Create a TEMP_CONFIG packet (v2.0)
+ *
+ * @param packet Output packet
+ * @param config Temperature configuration parameters
+ */
+void helios_create_temp_config(helios_packet_t* packet,
+    const helios_cmd_temp_config_t* config);
+
+/**
+ * Create a GLOW_CONFIG packet (v2.0)
+ *
+ * @param packet Output packet
+ * @param config Glow plug configuration parameters
+ */
+void helios_create_glow_config(helios_packet_t* packet,
+    const helios_cmd_glow_config_t* config);
+
+/**
+ * Create a DATA_SUBSCRIPTION packet (v2.0)
+ *
+ * @param packet Output packet
+ * @param appliance_address Address of appliance to subscribe to
+ * @param message_filter Message type filter bitmask
+ */
+void helios_create_data_subscription(helios_packet_t* packet,
+    uint64_t appliance_address, uint64_t message_filter);
+
+/**
+ * Create a DATA_UNSUBSCRIPTION packet (v2.0)
+ *
+ * @param packet Output packet
+ * @param appliance_address Address of appliance to unsubscribe from
+ */
+void helios_create_data_unsubscription(helios_packet_t* packet,
+    uint64_t appliance_address);
+
+/**
+ * Create a DISCOVERY_REQUEST packet (v2.0)
+ *
+ * @param packet Output packet
+ */
+void helios_create_discovery_request(helios_packet_t* packet);
+
+/**
  * Create a STATE_DATA packet
  *
  * @param packet Output packet
@@ -337,9 +459,9 @@ void helios_create_ping_response(helios_packet_t* packet, uint64_t uptime_ms);
  * @param state Current state
  * @param error Error code
  * @param motors Array of motor data
- * @param motor_count Number of motors (1-3)
+ * @param motor_count Number of motors (1-5)
  * @param temperatures Array of temperature data
- * @param temp_count Number of temperatures (1-3)
+ * @param temp_count Number of temperatures (1-4)
  * @return 0 on success, negative on error
  */
 int helios_create_telemetry_bundle(helios_packet_t* packet,
@@ -348,6 +470,16 @@ int helios_create_telemetry_bundle(helios_packet_t* packet,
     uint8_t motor_count,
     const helios_telemetry_temperature_t* temperatures,
     uint8_t temp_count);
+
+/**
+ * Create a DEVICE_ANNOUNCE packet (v2.0)
+ *
+ * @param packet Output packet
+ * @param device_type Device type identifier
+ * @param capabilities Capabilities bitmask
+ */
+void helios_create_device_announce(helios_packet_t* packet,
+    uint32_t device_type, uint32_t capabilities);
 
 /**
  * Helios state command message (for Zbus/IPC)
