@@ -769,8 +769,8 @@ void helios_create_new_command(helios_packet_t* packet,
 
 ## References
 
-- **Protocol Documentation:** See `apps/helios/docs/serial_protocol.md`
-- **Integration Example:** See `apps/helios/src/communications/serial_handler.c`
+- **Protocol Documentation:** See `../../../origin/docs/protocols/serial_protocol.md` (Fusain Protocol v2.0)
+- **Integration Example:** See `../../apps/helios/src/communications/serial_handler.c`
 - **CRC-16-CCITT:** Polynomial 0x1021, initial value 0xFFFF
 - **Byte Stuffing:** Consistent Overhead Byte Stuffing (COBS) variant
 
