@@ -6,7 +6,7 @@ menuconfig FUSAIN
 	help
 	  Enable the Fusain serial protocol encoder/decoder library.
 	  This library provides CRC-16-CCITT calculation, packet encoding
-	  with byte stuffing, and stateful packet decoding for the Helios
+	  with byte stuffing, and stateful packet decoding for the Fusain
 	  serial communication protocol.
 
 	  Note: This is a pure C library with no Zephyr dependencies.

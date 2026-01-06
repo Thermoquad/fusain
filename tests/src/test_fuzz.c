@@ -31,24 +31,24 @@ ZTEST(fusain_fuzz, test_fuzz_encoding)
   int expected_fail_count = 0;
 
   for (int round = 0; round < CONFIG_FUSAIN_TEST_FUZZ_ROUNDS; round++) {
-    helios_packet_t packet;
+    fusain_packet_t packet;
 
     /* Random length (including invalid values to test error handling) */
-    int length = fuzz_rand() % (HELIOS_MAX_PAYLOAD_SIZE + 50);
+    int length = fuzz_rand() % (FUSAIN_MAX_PAYLOAD_SIZE + 50);
     packet.length = length;
 
     /* Random message type */
     packet.msg_type = fuzz_rand_byte();
 
     /* Fill payload with random data */
-    for (int i = 0; i < HELIOS_MAX_PAYLOAD_SIZE; i++) {
+    for (int i = 0; i < FUSAIN_MAX_PAYLOAD_SIZE; i++) {
       packet.payload[i] = fuzz_rand_byte();
     }
 
-    uint8_t buffer[HELIOS_MAX_PACKET_SIZE * 2];
-    int encoded_len = helios_encode_packet(&packet, buffer, sizeof(buffer));
+    uint8_t buffer[FUSAIN_MAX_PACKET_SIZE * 2];
+    int encoded_len = fusain_encode_packet(&packet, buffer, sizeof(buffer));
 
-    if (length <= HELIOS_MAX_PAYLOAD_SIZE) {
+    if (length <= FUSAIN_MAX_PAYLOAD_SIZE) {
       /* Should succeed for valid lengths */
       zassert_true(encoded_len > 0,
           "Round %d: Valid packet should encode (len=%d)",
@@ -56,9 +56,9 @@ ZTEST(fusain_fuzz, test_fuzz_encoding)
       success_count++;
 
       /* Verify framing */
-      zassert_equal(buffer[0], HELIOS_START_BYTE,
+      zassert_equal(buffer[0], FUSAIN_START_BYTE,
           "Round %d: Should start with START byte", round);
-      zassert_equal(buffer[encoded_len - 1], HELIOS_END_BYTE,
+      zassert_equal(buffer[encoded_len - 1], FUSAIN_END_BYTE,
           "Round %d: Should end with END byte", round);
     } else {
       /* Should fail for invalid lengths */
@@ -79,10 +79,10 @@ ZTEST(fusain_fuzz, test_fuzz_decoding_random)
   int detected_errors = 0;
 
   for (int round = 0; round < CONFIG_FUSAIN_TEST_FUZZ_ROUNDS; round++) {
-    helios_decoder_t decoder;
-    helios_reset_decoder(&decoder);
+    fusain_decoder_t decoder;
+    fusain_reset_decoder(&decoder);
 
-    helios_packet_t packet;
+    fusain_packet_t packet;
     uint8_t random_data[100];
 
     /* Generate random byte stream */
@@ -91,16 +91,16 @@ ZTEST(fusain_fuzz, test_fuzz_decoding_random)
     }
 
     /* Feed to decoder */
-    helios_decode_result_t result = HELIOS_DECODE_INCOMPLETE;
+    fusain_decode_result_t result = FUSAIN_DECODE_INCOMPLETE;
     for (int i = 0; i < sizeof(random_data); i++) {
-      result = helios_decode_byte(random_data[i], &packet, &decoder);
+      result = fusain_decode_byte(random_data[i], &packet, &decoder);
 
       /* Decoder should never crash, only return valid states */
-      zassert_true(result >= HELIOS_DECODE_OK && result <= HELIOS_DECODE_BUFFER_OVERFLOW,
+      zassert_true(result >= FUSAIN_DECODE_OK && result <= FUSAIN_DECODE_BUFFER_OVERFLOW,
           "Round %d: Decoder should return valid result",
           round);
 
-      if (result != HELIOS_DECODE_INCOMPLETE && result != HELIOS_DECODE_OK) {
+      if (result != FUSAIN_DECODE_INCOMPLETE && result != FUSAIN_DECODE_OK) {
         detected_errors++;
         break;
       }
@@ -116,10 +116,10 @@ ZTEST(fusain_fuzz, test_fuzz_roundtrip)
   int success_count = 0;
 
   for (int round = 0; round < CONFIG_FUSAIN_TEST_FUZZ_ROUNDS; round++) {
-    helios_packet_t tx_packet;
+    fusain_packet_t tx_packet;
 
     /* Random valid length */
-    tx_packet.length = fuzz_rand() % (HELIOS_MAX_PAYLOAD_SIZE + 1);
+    tx_packet.length = fuzz_rand() % (FUSAIN_MAX_PAYLOAD_SIZE + 1);
 
     /* Random message type */
     tx_packet.msg_type = fuzz_rand_byte();
@@ -130,26 +130,26 @@ ZTEST(fusain_fuzz, test_fuzz_roundtrip)
     }
 
     /* Encode */
-    uint8_t buffer[HELIOS_MAX_PACKET_SIZE * 2];
-    int encoded_len = helios_encode_packet(&tx_packet, buffer, sizeof(buffer));
+    uint8_t buffer[FUSAIN_MAX_PACKET_SIZE * 2];
+    int encoded_len = fusain_encode_packet(&tx_packet, buffer, sizeof(buffer));
 
     if (encoded_len < 0) {
       continue; /* Skip invalid packets */
     }
 
     /* Decode */
-    helios_decoder_t decoder;
-    helios_reset_decoder(&decoder);
+    fusain_decoder_t decoder;
+    fusain_reset_decoder(&decoder);
 
-    helios_packet_t rx_packet;
-    helios_decode_result_t result = HELIOS_DECODE_INCOMPLETE;
+    fusain_packet_t rx_packet;
+    fusain_decode_result_t result = FUSAIN_DECODE_INCOMPLETE;
 
     for (int i = 0; i < encoded_len; i++) {
-      result = helios_decode_byte(buffer[i], &rx_packet, &decoder);
+      result = fusain_decode_byte(buffer[i], &rx_packet, &decoder);
     }
 
     /* Should decode successfully */
-    zassert_equal(result, HELIOS_DECODE_OK,
+    zassert_equal(result, FUSAIN_DECODE_OK,
         "Round %d: Decoding should succeed", round);
 
     /* Verify data integrity */
@@ -170,8 +170,8 @@ ZTEST(fusain_fuzz, test_fuzz_roundtrip)
 ZTEST(fusain_fuzz, test_fuzz_crc)
 {
   for (int round = 0; round < CONFIG_FUSAIN_TEST_FUZZ_ROUNDS; round++) {
-    uint8_t data[HELIOS_MAX_PAYLOAD_SIZE];
-    int length = fuzz_rand() % (HELIOS_MAX_PAYLOAD_SIZE + 1);
+    uint8_t data[FUSAIN_MAX_PAYLOAD_SIZE];
+    int length = fuzz_rand() % (FUSAIN_MAX_PAYLOAD_SIZE + 1);
 
     /* Fill with random data */
     for (int i = 0; i < length; i++) {
@@ -179,8 +179,8 @@ ZTEST(fusain_fuzz, test_fuzz_crc)
     }
 
     /* Calculate CRC twice - should be deterministic */
-    uint16_t crc1 = helios_crc16(data, length);
-    uint16_t crc2 = helios_crc16(data, length);
+    uint16_t crc1 = fusain_crc16(data, length);
+    uint16_t crc2 = fusain_crc16(data, length);
 
     zassert_equal(crc1, crc2, "Round %d: CRC should be deterministic",
         round);
@@ -188,7 +188,7 @@ ZTEST(fusain_fuzz, test_fuzz_crc)
     /* Flip a bit and verify CRC changes (if length > 0) */
     if (length > 0) {
       data[0] ^= 0x01;
-      uint16_t crc3 = helios_crc16(data, length);
+      uint16_t crc3 = fusain_crc16(data, length);
       zassert_not_equal(crc1, crc3,
           "Round %d: CRC should change with data", round);
     }
@@ -201,8 +201,8 @@ ZTEST(fusain_fuzz, test_fuzz_byte_stuffing)
   int stuffed_count = 0;
 
   for (int round = 0; round < CONFIG_FUSAIN_TEST_FUZZ_ROUNDS; round++) {
-    helios_packet_t packet;
-    packet.length = (fuzz_rand() % HELIOS_MAX_PAYLOAD_SIZE) + 1;
+    fusain_packet_t packet;
+    packet.length = (fuzz_rand() % FUSAIN_MAX_PAYLOAD_SIZE) + 1;
     packet.msg_type = fuzz_rand_byte();
 
     /* Occasionally inject special bytes to force stuffing */
@@ -210,8 +210,8 @@ ZTEST(fusain_fuzz, test_fuzz_byte_stuffing)
     for (int i = 0; i < packet.length; i++) {
       if (force_stuffing && (i % 3) == 0) {
         /* Force special bytes */
-        uint8_t special[] = { HELIOS_START_BYTE,
-          HELIOS_END_BYTE, HELIOS_ESC_BYTE };
+        uint8_t special[] = { FUSAIN_START_BYTE,
+          FUSAIN_END_BYTE, FUSAIN_ESC_BYTE };
         packet.payload[i] = special[fuzz_rand() % 3];
       } else {
         packet.payload[i] = fuzz_rand_byte();
@@ -219,22 +219,22 @@ ZTEST(fusain_fuzz, test_fuzz_byte_stuffing)
     }
 
     /* Encode and decode */
-    uint8_t buffer[HELIOS_MAX_PACKET_SIZE * 2];
-    int encoded_len = helios_encode_packet(&packet, buffer, sizeof(buffer));
+    uint8_t buffer[FUSAIN_MAX_PACKET_SIZE * 2];
+    int encoded_len = fusain_encode_packet(&packet, buffer, sizeof(buffer));
 
     zassert_true(encoded_len > 0, "Round %d: Encoding should succeed", round);
 
-    helios_decoder_t decoder;
-    helios_reset_decoder(&decoder);
+    fusain_decoder_t decoder;
+    fusain_reset_decoder(&decoder);
 
-    helios_packet_t rx_packet;
-    helios_decode_result_t result = HELIOS_DECODE_INCOMPLETE;
+    fusain_packet_t rx_packet;
+    fusain_decode_result_t result = FUSAIN_DECODE_INCOMPLETE;
 
     for (int i = 0; i < encoded_len; i++) {
-      result = helios_decode_byte(buffer[i], &rx_packet, &decoder);
+      result = fusain_decode_byte(buffer[i], &rx_packet, &decoder);
     }
 
-    zassert_equal(result, HELIOS_DECODE_OK,
+    zassert_equal(result, FUSAIN_DECODE_OK,
         "Round %d: Decoding should succeed", round);
     zassert_mem_equal(rx_packet.payload, packet.payload, packet.length,
         "Round %d: Payload should survive stuffing", round);
@@ -255,7 +255,7 @@ ZTEST(fusain_fuzz, test_fuzz_decoder_errors)
 
   for (int round = 0; round < CONFIG_FUSAIN_TEST_FUZZ_ROUNDS; round++) {
     /* Create valid packet */
-    helios_packet_t tx_packet;
+    fusain_packet_t tx_packet;
     tx_packet.length = (fuzz_rand() % 20) + 1; /* Smaller for faster test */
     tx_packet.msg_type = fuzz_rand_byte();
 
@@ -263,8 +263,8 @@ ZTEST(fusain_fuzz, test_fuzz_decoder_errors)
       tx_packet.payload[i] = fuzz_rand_byte();
     }
 
-    uint8_t buffer[HELIOS_MAX_PACKET_SIZE * 2];
-    int encoded_len = helios_encode_packet(&tx_packet, buffer, sizeof(buffer));
+    uint8_t buffer[FUSAIN_MAX_PACKET_SIZE * 2];
+    int encoded_len = fusain_encode_packet(&tx_packet, buffer, sizeof(buffer));
 
     if (encoded_len < 0) {
       continue;
@@ -277,35 +277,35 @@ ZTEST(fusain_fuzz, test_fuzz_decoder_errors)
     }
 
     /* Decode corrupted packet */
-    helios_decoder_t decoder;
-    helios_reset_decoder(&decoder);
+    fusain_decoder_t decoder;
+    fusain_reset_decoder(&decoder);
 
-    helios_packet_t rx_packet;
-    helios_decode_result_t result = HELIOS_DECODE_INCOMPLETE;
+    fusain_packet_t rx_packet;
+    fusain_decode_result_t result = FUSAIN_DECODE_INCOMPLETE;
 
     for (int i = 0; i < encoded_len; i++) {
-      result = helios_decode_byte(buffer[i], &rx_packet, &decoder);
-      if (result != HELIOS_DECODE_INCOMPLETE) {
+      result = fusain_decode_byte(buffer[i], &rx_packet, &decoder);
+      if (result != FUSAIN_DECODE_INCOMPLETE) {
         break;
       }
     }
 
     /* Should detect error (not crash) */
-    if (result != HELIOS_DECODE_OK) {
+    if (result != FUSAIN_DECODE_OK) {
       error_recovery_count++;
 
       /* Reset and try valid packet */
-      helios_reset_decoder(&decoder);
-      encoded_len = helios_encode_packet(&tx_packet, buffer,
+      fusain_reset_decoder(&decoder);
+      encoded_len = fusain_encode_packet(&tx_packet, buffer,
           sizeof(buffer));
 
-      result = HELIOS_DECODE_INCOMPLETE;
+      result = FUSAIN_DECODE_INCOMPLETE;
       for (int i = 0; i < encoded_len; i++) {
-        result = helios_decode_byte(buffer[i], &rx_packet,
+        result = fusain_decode_byte(buffer[i], &rx_packet,
             &decoder);
       }
 
-      zassert_equal(result, HELIOS_DECODE_OK,
+      zassert_equal(result, FUSAIN_DECODE_OK,
           "Round %d: Should recover after error", round);
     }
   }
@@ -317,12 +317,12 @@ ZTEST(fusain_fuzz, test_fuzz_decoder_errors)
 ZTEST(fusain_fuzz, test_fuzz_v2_packets)
 {
   for (int round = 0; round < CONFIG_FUSAIN_TEST_FUZZ_ROUNDS; round++) {
-    helios_packet_t packet;
+    fusain_packet_t packet;
 
     /* Test different v2.0 packet types */
     switch (round % 8) {
     case 0: {
-      helios_cmd_motor_config_t config = {
+      fusain_cmd_motor_config_t config = {
         .motor = fuzz_rand(),
         .pwm_period = fuzz_rand(),
         .pid_kp = (double)fuzz_rand() / 1000.0,
@@ -332,20 +332,20 @@ ZTEST(fusain_fuzz, test_fuzz_v2_packets)
         .min_rpm = fuzz_rand(),
         .min_pwm_duty = fuzz_rand(),
       };
-      helios_create_motor_config(&packet, &config);
+      fusain_create_motor_config(&packet, &config);
       break;
     }
     case 1: {
-      helios_cmd_pump_config_t config = {
+      fusain_cmd_pump_config_t config = {
         .pump = fuzz_rand(),
         .min_rate_ms = fuzz_rand(),
         .max_rate_ms = fuzz_rand(),
       };
-      helios_create_pump_config(&packet, &config);
+      fusain_create_pump_config(&packet, &config);
       break;
     }
     case 2: {
-      helios_cmd_temp_config_t config = {
+      fusain_cmd_temp_config_t config = {
         .thermometer = fuzz_rand(),
         .pid_kp = (double)fuzz_rand() / 1000.0,
         .pid_ki = (double)fuzz_rand() / 1000.0,
@@ -353,52 +353,52 @@ ZTEST(fusain_fuzz, test_fuzz_v2_packets)
         .sample_count = fuzz_rand(),
         .read_rate = fuzz_rand(),
       };
-      helios_create_temp_config(&packet, &config);
+      fusain_create_temp_config(&packet, &config);
       break;
     }
     case 3: {
-      helios_cmd_glow_config_t config = {
+      fusain_cmd_glow_config_t config = {
         .glow = fuzz_rand(),
         .max_duration_ms = fuzz_rand(),
       };
-      helios_create_glow_config(&packet, &config);
+      fusain_create_glow_config(&packet, &config);
       break;
     }
     case 4:
-      helios_create_data_subscription(&packet,
+      fusain_create_data_subscription(&packet,
           (uint64_t)fuzz_rand() << 32 | fuzz_rand(),
           fuzz_rand());
       break;
     case 5:
-      helios_create_data_unsubscription(
+      fusain_create_data_unsubscribe(
           &packet, (uint64_t)fuzz_rand() << 32 | fuzz_rand());
       break;
     case 6:
-      helios_create_discovery_request(&packet);
+      fusain_create_discovery_request(&packet);
       break;
     case 7:
-      helios_create_device_announce(&packet, fuzz_rand(),
+      fusain_create_device_announce(&packet, fuzz_rand(),
           fuzz_rand());
       break;
     }
 
     /* Encode and decode */
-    uint8_t buffer[HELIOS_MAX_PACKET_SIZE * 2];
-    int len = helios_encode_packet(&packet, buffer, sizeof(buffer));
+    uint8_t buffer[FUSAIN_MAX_PACKET_SIZE * 2];
+    int len = fusain_encode_packet(&packet, buffer, sizeof(buffer));
 
     zassert_true(len > 0, "Round %d: v2.0 packet should encode", round);
 
-    helios_decoder_t decoder;
-    helios_reset_decoder(&decoder);
+    fusain_decoder_t decoder;
+    fusain_reset_decoder(&decoder);
 
-    helios_packet_t rx_packet;
-    helios_decode_result_t result = HELIOS_DECODE_INCOMPLETE;
+    fusain_packet_t rx_packet;
+    fusain_decode_result_t result = FUSAIN_DECODE_INCOMPLETE;
 
     for (int i = 0; i < len; i++) {
-      result = helios_decode_byte(buffer[i], &rx_packet, &decoder);
+      result = fusain_decode_byte(buffer[i], &rx_packet, &decoder);
     }
 
-    zassert_equal(result, HELIOS_DECODE_OK,
+    zassert_equal(result, FUSAIN_DECODE_OK,
         "Round %d: v2.0 packet should decode", round);
   }
 }

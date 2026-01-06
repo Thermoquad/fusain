@@ -38,7 +38,7 @@ Functional tests have fixed test cases and do not use configurable round counts.
 
 - **Message Types Tested**
   - Commands: SET_MODE, SET_PUMP_RATE, SET_TARGET_RPM, GLOW_COMMAND, PING_REQUEST, TELEMETRY_CONFIG
-  - Config: MOTOR_CONFIG, PUMP_CONFIG, TEMP_CONFIG, GLOW_CONFIG, DATA_SUBSCRIPTION/UNSUBSCRIPTION, DISCOVERY_REQUEST
+  - Config: MOTOR_CONFIG, PUMP_CONFIG, TEMP_CONFIG, GLOW_CONFIG, DATA_SUBSCRIPTION/UNSUBSCRIBE, DISCOVERY_REQUEST
   - Data: STATE_DATA, PING_RESPONSE, DEVICE_ANNOUNCE, TELEMETRY_BUNDLE
 
 ### Fuzz Tests (43 test cases)
@@ -147,8 +147,8 @@ Example (functional test):
 ZTEST(fusain_protocol, test_my_feature)
 {
     // Fixed test case
-    helios_packet_t packet = {...};
-    int result = helios_encode_packet(&packet, ...);
+    fusain_packet_t packet = {...};
+    int result = fusain_encode_packet(&packet, ...);
     zassert_true(result > 0, "Should succeed");
 }
 

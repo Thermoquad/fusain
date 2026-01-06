@@ -6,7 +6,7 @@
 
 ## Module Overview
 
-**fusain** is a platform-independent C library that implements the Helios serial communication protocol. It provides CRC-16-CCITT calculation, packet encoding with byte stuffing, and stateful packet decoding for reliable serial communication.
+**fusain** is a platform-independent C library that implements the Fusain serial communication protocol. It provides CRC-16-CCITT calculation, packet encoding with byte stuffing, and stateful packet decoding for reliable serial communication.
 
 **Key Features:**
 - Pure C implementation with zero dependencies beyond standard C library
@@ -25,7 +25,7 @@
 
 ### Protocol Design
 
-The Helios serial protocol uses a binary packet format with the following structure:
+The Fusain serial protocol uses a binary packet format with the following structure:
 
 ```
 [START][LENGTH][TYPE][PAYLOAD...][CRC_HIGH][CRC_LOW][END]
@@ -77,33 +77,33 @@ The CRC is calculated over the unstuffed data and then the CRC bytes themselves 
 
 | Type | Value | Payload | Description |
 |------|-------|---------|-------------|
-| `HELIOS_MSG_SET_MODE` | 0x10 | `helios_cmd_set_mode_t` | Set operating mode (idle, fan, heat, emergency) |
-| `HELIOS_MSG_SET_PUMP_RATE` | 0x11 | `helios_cmd_set_pump_rate_t` | Set fuel pump rate |
-| `HELIOS_MSG_SET_TARGET_RPM` | 0x12 | `helios_cmd_set_target_rpm_t` | Set target motor RPM |
-| `HELIOS_MSG_PING_REQUEST` | 0x13 | None | Keepalive ping |
-| `HELIOS_MSG_SET_TIMEOUT_CONFIG` | 0x14 | `helios_cmd_set_timeout_config_t` | Configure timeout behavior |
-| `HELIOS_MSG_EMERGENCY_STOP` | 0x15 | None | Immediate emergency stop |
+| `FUSAIN_MSG_SET_MODE` | 0x10 | `fusain_cmd_set_mode_t` | Set operating mode (idle, fan, heat, emergency) |
+| `FUSAIN_MSG_SET_PUMP_RATE` | 0x11 | `fusain_cmd_set_pump_rate_t` | Set fuel pump rate |
+| `FUSAIN_MSG_SET_TARGET_RPM` | 0x12 | `fusain_cmd_set_target_rpm_t` | Set target motor RPM |
+| `FUSAIN_MSG_PING_REQUEST` | 0x13 | None | Keepalive ping |
+| `FUSAIN_MSG_SET_TIMEOUT_CONFIG` | 0x14 | `fusain_cmd_set_timeout_config_t` | Configure timeout behavior |
+| `FUSAIN_MSG_EMERGENCY_STOP` | 0x15 | None | Immediate emergency stop |
 
 ### Data (ICU → Master)
 
 | Type | Value | Payload | Description |
 |------|-------|---------|-------------|
-| `HELIOS_MSG_STATE_DATA` | 0x20 | `helios_data_state_t` | Current state and error code |
-| `HELIOS_MSG_MOTOR_DATA` | 0x21 | `helios_data_motor_t` | Motor telemetry (RPM, PWM, etc.) |
-| `HELIOS_MSG_TEMPERATURE_DATA` | 0x22 | `helios_data_temperature_t` | Temperature and PID status |
-| `HELIOS_MSG_PUMP_DATA` | 0x23 | `helios_data_pump_t` | Pump status and pulse count |
-| `HELIOS_MSG_GLOW_DATA` | 0x24 | `helios_data_glow_t` | Glow plug status |
-| `HELIOS_MSG_TELEMETRY_BUNDLE` | 0x25 | `helios_data_telemetry_bundle_t` | Aggregated telemetry (variable length) |
-| `HELIOS_MSG_PING_RESPONSE` | 0x26 | `helios_data_ping_response_t` | Ping response with uptime |
+| `FUSAIN_MSG_STATE_DATA` | 0x20 | `fusain_data_state_t` | Current state and error code |
+| `FUSAIN_MSG_MOTOR_DATA` | 0x21 | `fusain_data_motor_t` | Motor telemetry (RPM, PWM, etc.) |
+| `FUSAIN_MSG_TEMPERATURE_DATA` | 0x22 | `fusain_data_temperature_t` | Temperature and PID status |
+| `FUSAIN_MSG_PUMP_DATA` | 0x23 | `fusain_data_pump_t` | Pump status and pulse count |
+| `FUSAIN_MSG_GLOW_DATA` | 0x24 | `fusain_data_glow_t` | Glow plug status |
+| `FUSAIN_MSG_TELEMETRY_BUNDLE` | 0x25 | `fusain_data_telemetry_bundle_t` | Aggregated telemetry (variable length) |
+| `FUSAIN_MSG_PING_RESPONSE` | 0x26 | `fusain_data_ping_response_t` | Ping response with uptime |
 
 ### Errors (Bidirectional)
 
 | Type | Value | Payload | Description |
 |------|-------|---------|-------------|
-| `HELIOS_MSG_ERROR_INVALID_COMMAND` | 0xE0 | `helios_error_invalid_command_t` | Unrecognized command |
-| `HELIOS_MSG_ERROR_INVALID_CRC` | 0xE1 | `helios_error_invalid_crc_t` | CRC mismatch |
-| `HELIOS_MSG_ERROR_INVALID_LENGTH` | 0xE2 | `helios_error_invalid_length_t` | Payload length error |
-| `HELIOS_MSG_ERROR_TIMEOUT` | 0xE3 | None | Communication timeout |
+| `FUSAIN_MSG_ERROR_INVALID_COMMAND` | 0xE0 | `fusain_error_invalid_command_t` | Unrecognized command |
+| `FUSAIN_MSG_ERROR_INVALID_CRC` | 0xE1 | `fusain_error_invalid_crc_t` | CRC mismatch |
+| `FUSAIN_MSG_ERROR_INVALID_LENGTH` | 0xE2 | `fusain_error_invalid_length_t` | Payload length error |
+| `FUSAIN_MSG_ERROR_TIMEOUT` | 0xE3 | None | Communication timeout |
 
 ---
 
@@ -134,7 +134,7 @@ fusain/
 #### CRC Calculation
 
 ```c
-uint16_t helios_crc16(const uint8_t* data, size_t length);
+uint16_t fusain_crc16(const uint8_t* data, size_t length);
 ```
 
 Calculates CRC-16-CCITT over the provided data.
@@ -152,7 +152,7 @@ Calculates CRC-16-CCITT over the provided data.
 #### Packet Encoding
 
 ```c
-int helios_encode_packet(const helios_packet_t* packet,
+int fusain_encode_packet(const fusain_packet_t* packet,
                          uint8_t* buffer,
                          size_t buffer_size);
 ```
@@ -162,7 +162,7 @@ Encodes a packet structure into a byte stream with byte stuffing and CRC.
 **Parameters:**
 - `packet` - Packet structure to encode
 - `buffer` - Output buffer for encoded bytes
-- `buffer_size` - Size of output buffer (must be at least `HELIOS_MAX_PACKET_SIZE * 2`)
+- `buffer_size` - Size of output buffer (must be at least `FUSAIN_MAX_PACKET_SIZE * 2`)
 
 **Returns:**
 - Number of bytes written on success
@@ -180,8 +180,8 @@ Encodes a packet structure into a byte stream with byte stuffing and CRC.
 #### Packet Decoding
 
 ```c
-helios_decode_result_t helios_decode_byte(uint8_t rx_byte,
-                                          helios_packet_t* packet,
+fusain_decode_result_t fusain_decode_byte(uint8_t rx_byte,
+                                          fusain_packet_t* packet,
                                           uint8_t* state,
                                           uint8_t* buffer,
                                           size_t* buffer_index,
@@ -192,19 +192,19 @@ Decodes received bytes into a packet structure. Call repeatedly as bytes are rec
 
 **Parameters:**
 - `rx_byte` - Received byte to process
-- `packet` - Output packet structure (valid only when result is `HELIOS_DECODE_OK`)
+- `packet` - Output packet structure (valid only when result is `FUSAIN_DECODE_OK`)
 - `state` - Decoder state (initialize to 0, maintain between calls)
-- `buffer` - Internal decode buffer (must be `HELIOS_MAX_PACKET_SIZE` bytes)
+- `buffer` - Internal decode buffer (must be `FUSAIN_MAX_PACKET_SIZE` bytes)
 - `buffer_index` - Current buffer index (initialize to 0, maintain between calls)
 - `escape_next` - Escape flag (initialize to false, maintain between calls)
 
 **Returns:**
-- `HELIOS_DECODE_OK` - Packet complete and valid (check `packet`)
-- `HELIOS_DECODE_INCOMPLETE` - Need more bytes
-- `HELIOS_DECODE_INVALID_START` - Invalid start/end byte
-- `HELIOS_DECODE_INVALID_CRC` - CRC mismatch
-- `HELIOS_DECODE_INVALID_LENGTH` - Invalid payload length
-- `HELIOS_DECODE_BUFFER_OVERFLOW` - Buffer overflow
+- `FUSAIN_DECODE_OK` - Packet complete and valid (check `packet`)
+- `FUSAIN_DECODE_INCOMPLETE` - Need more bytes
+- `FUSAIN_DECODE_INVALID_START` - Invalid start/end byte
+- `FUSAIN_DECODE_INVALID_CRC` - CRC mismatch
+- `FUSAIN_DECODE_INVALID_LENGTH` - Invalid payload length
+- `FUSAIN_DECODE_BUFFER_OVERFLOW` - Buffer overflow
 
 **Thread Safety:** NOT thread-safe (requires separate state per connection)
 
@@ -223,7 +223,7 @@ The decoder maintains internal state across calls:
 #### Decoder Reset
 
 ```c
-void helios_reset_decoder(uint8_t* state,
+void fusain_reset_decoder(uint8_t* state,
                           size_t* buffer_index,
                           bool* escape_next);
 ```
@@ -246,45 +246,45 @@ The library provides convenience functions for creating common message types:
 #### Command Helpers
 
 ```c
-void helios_create_set_mode(helios_packet_t* packet,
-                            helios_mode_t mode,
+void fusain_create_set_mode(fusain_packet_t* packet,
+                            fusain_mode_t mode,
                             uint32_t parameter);
 
-void helios_create_set_pump_rate(helios_packet_t* packet,
+void fusain_create_set_pump_rate(fusain_packet_t* packet,
                                  uint32_t rate_ms);
 
-void helios_create_set_target_rpm(helios_packet_t* packet,
+void fusain_create_set_target_rpm(fusain_packet_t* packet,
                                   uint32_t target_rpm);
 
-void helios_create_ping_request(helios_packet_t* packet);
+void fusain_create_ping_request(fusain_packet_t* packet);
 
-void helios_create_set_timeout_config(helios_packet_t* packet,
+void fusain_create_set_timeout_config(fusain_packet_t* packet,
                                       bool enabled,
                                       uint32_t timeout_ms);
 
-void helios_create_emergency_stop(helios_packet_t* packet);
+void fusain_create_emergency_stop(fusain_packet_t* packet);
 ```
 
 #### Data Helpers
 
 ```c
-void helios_create_state_data(helios_packet_t* packet,
-                              helios_state_t state,
-                              helios_error_t error);
+void fusain_create_state_data(fusain_packet_t* packet,
+                              fusain_state_t state,
+                              fusain_error_t error);
 
-void helios_create_ping_response(helios_packet_t* packet,
+void fusain_create_ping_response(fusain_packet_t* packet,
                                  uint64_t uptime_ms);
 
-int helios_create_telemetry_bundle(helios_packet_t* packet,
-                                   helios_state_t state,
-                                   helios_error_t error,
-                                   const helios_telemetry_motor_t* motors,
+int fusain_create_telemetry_bundle(fusain_packet_t* packet,
+                                   fusain_state_t state,
+                                   fusain_error_t error,
+                                   const fusain_telemetry_motor_t* motors,
                                    uint8_t motor_count,
-                                   const helios_telemetry_temperature_t* temperatures,
+                                   const fusain_telemetry_temperature_t* temperatures,
                                    uint8_t temp_count);
 ```
 
-**Note:** All helpers populate the `packet` structure. You must still call `helios_encode_packet()` to serialize for transmission.
+**Note:** All helpers populate the `packet` structure. You must still call `fusain_encode_packet()` to serialize for transmission.
 
 ---
 
@@ -296,12 +296,12 @@ int helios_create_telemetry_bundle(helios_packet_t* packet,
 #include <fusain/fusain.h>
 
 // Create a ping request
-helios_packet_t packet;
-helios_create_ping_request(&packet);
+fusain_packet_t packet;
+fusain_create_ping_request(&packet);
 
 // Encode to byte buffer
-uint8_t tx_buffer[HELIOS_MAX_PACKET_SIZE * 2];
-int len = helios_encode_packet(&packet, tx_buffer, sizeof(tx_buffer));
+uint8_t tx_buffer[FUSAIN_MAX_PACKET_SIZE * 2];
+int len = fusain_encode_packet(&packet, tx_buffer, sizeof(tx_buffer));
 
 if (len > 0) {
     // Send via UART (platform-specific)
@@ -318,26 +318,26 @@ if (len > 0) {
 #include <fusain/fusain.h>
 
 // Decoder state (persistent)
-helios_decoder_t decoder;
+fusain_decoder_t decoder;
 
 // Initialize decoder
-helios_reset_decoder(&decoder);
+fusain_reset_decoder(&decoder);
 
 // Process incoming bytes
 while (uart_has_data()) {
     uint8_t byte = uart_read_byte();
-    helios_packet_t packet;
+    fusain_packet_t packet;
 
-    helios_decode_result_t result = helios_decode_byte(byte, &packet, &decoder);
+    fusain_decode_result_t result = fusain_decode_byte(byte, &packet, &decoder);
 
-    if (result == HELIOS_DECODE_OK) {
+    if (result == FUSAIN_DECODE_OK) {
         // Packet complete and valid
         printf("Received message type: 0x%02X\n", packet.msg_type);
         process_packet(&packet);
-    } else if (result != HELIOS_DECODE_INCOMPLETE) {
+    } else if (result != FUSAIN_DECODE_INCOMPLETE) {
         // Decode error - reset and continue
         printf("Decode error: %d\n", result);
-        helios_reset_decoder(&decoder);
+        fusain_reset_decoder(&decoder);
     }
 }
 ```
@@ -348,7 +348,7 @@ while (uart_has_data()) {
 #include <fusain/fusain.h>
 
 // Prepare motor data (supports 1-3 motors)
-helios_telemetry_motor_t motors[1] = {
+fusain_telemetry_motor_t motors[1] = {
     {
         .rpm = 2500,
         .target_rpm = 2500,
@@ -357,26 +357,26 @@ helios_telemetry_motor_t motors[1] = {
 };
 
 // Prepare temperature data (supports 1-3 sensors)
-helios_telemetry_temperature_t temps[1] = {
+fusain_telemetry_temperature_t temps[1] = {
     {
         .temperature = 220.5
     }
 };
 
 // Create telemetry bundle
-helios_packet_t packet;
-int ret = helios_create_telemetry_bundle(
+fusain_packet_t packet;
+int ret = fusain_create_telemetry_bundle(
     &packet,
-    HELIOS_STATE_HEATING,
-    HELIOS_ERROR_NONE,
+    FUSAIN_STATE_HEATING,
+    FUSAIN_ERROR_NONE,
     motors, 1,
     temps, 1
 );
 
 if (ret == 0) {
     // Encode and send
-    uint8_t tx_buffer[HELIOS_MAX_PACKET_SIZE * 2];
-    int len = helios_encode_packet(&packet, tx_buffer, sizeof(tx_buffer));
+    uint8_t tx_buffer[FUSAIN_MAX_PACKET_SIZE * 2];
+    int len = fusain_encode_packet(&packet, tx_buffer, sizeof(tx_buffer));
     if (len > 0) {
         uart_send(tx_buffer, len);
     }
@@ -454,16 +454,16 @@ target_include_directories(myapp PRIVATE
 ## Thread Safety
 
 ### Encoder Functions
-- **Thread-safe:** `helios_encode_packet()`, `helios_crc16()`, all `helios_create_*()` helpers
+- **Thread-safe:** `fusain_encode_packet()`, `fusain_crc16()`, all `fusain_create_*()` helpers
 - **Reason:** Stateless, pure functions
 
 ### Decoder Functions
-- **NOT thread-safe:** `helios_decode_byte()`
+- **NOT thread-safe:** `fusain_decode_byte()`
 - **Reason:** Requires maintained state across calls
 - **Solution:** Use separate decoder state per connection, or protect with mutex
 
 ### Reset Function
-- **Thread-safe:** `helios_reset_decoder()`
+- **Thread-safe:** `fusain_reset_decoder()`
 - **Reason:** Simple state initialization
 
 ---
@@ -549,37 +549,37 @@ Tested in production use:
 ```c
 // Send commands periodically
 void send_ping(void) {
-    helios_packet_t packet;
-    helios_create_ping_request(&packet);
+    fusain_packet_t packet;
+    fusain_create_ping_request(&packet);
 
-    uint8_t tx_buffer[HELIOS_MAX_PACKET_SIZE * 2];
-    int len = helios_encode_packet(&packet, tx_buffer, sizeof(tx_buffer));
+    uint8_t tx_buffer[FUSAIN_MAX_PACKET_SIZE * 2];
+    int len = fusain_encode_packet(&packet, tx_buffer, sizeof(tx_buffer));
     uart_send(tx_buffer, len);
 }
 
 // Process received telemetry
-void process_telemetry(const helios_packet_t* packet) {
-    if (packet->msg_type == HELIOS_MSG_TELEMETRY_BUNDLE) {
-        helios_data_telemetry_bundle_t* bundle =
-            (helios_data_telemetry_bundle_t*)packet->payload;
+void process_telemetry(const fusain_packet_t* packet) {
+    if (packet->msg_type == FUSAIN_MSG_TELEMETRY_BUNDLE) {
+        fusain_data_telemetry_bundle_t* bundle =
+            (fusain_data_telemetry_bundle_t*)packet->payload;
 
         printf("State: %u, Error: %u\n", bundle->state, bundle->error);
 
         // Parse variable-length data
-        uint8_t* ptr = packet->payload + sizeof(helios_data_telemetry_bundle_t);
+        uint8_t* ptr = packet->payload + sizeof(fusain_data_telemetry_bundle_t);
 
         // Read motors
         for (int i = 0; i < bundle->motor_count; i++) {
-            helios_telemetry_motor_t* motor = (helios_telemetry_motor_t*)ptr;
+            fusain_telemetry_motor_t* motor = (fusain_telemetry_motor_t*)ptr;
             printf("Motor %d: RPM=%d, Target=%d\n", i, motor->rpm, motor->target_rpm);
-            ptr += sizeof(helios_telemetry_motor_t);
+            ptr += sizeof(fusain_telemetry_motor_t);
         }
 
         // Read temperatures
         for (int i = 0; i < bundle->temp_count; i++) {
-            helios_telemetry_temperature_t* temp = (helios_telemetry_temperature_t*)ptr;
+            fusain_telemetry_temperature_t* temp = (fusain_telemetry_temperature_t*)ptr;
             printf("Temp %d: %.1f°C\n", i, temp->temperature);
-            ptr += sizeof(helios_telemetry_temperature_t);
+            ptr += sizeof(fusain_telemetry_temperature_t);
         }
     }
 }
@@ -589,23 +589,23 @@ void process_telemetry(const helios_packet_t* packet) {
 
 ```c
 // Process received commands
-void process_command(const helios_packet_t* packet) {
+void process_command(const fusain_packet_t* packet) {
     switch (packet->msg_type) {
-        case HELIOS_MSG_SET_MODE: {
-            helios_cmd_set_mode_t* cmd = (helios_cmd_set_mode_t*)packet->payload;
+        case FUSAIN_MSG_SET_MODE: {
+            fusain_cmd_set_mode_t* cmd = (fusain_cmd_set_mode_t*)packet->payload;
             set_operating_mode(cmd->mode, cmd->parameter);
             break;
         }
 
-        case HELIOS_MSG_PING_REQUEST: {
+        case FUSAIN_MSG_PING_REQUEST: {
             // Respond with uptime
-            helios_packet_t response;
-            helios_create_ping_response(&response, get_uptime_ms());
+            fusain_packet_t response;
+            fusain_create_ping_response(&response, get_uptime_ms());
             send_packet(&response);
             break;
         }
 
-        case HELIOS_MSG_EMERGENCY_STOP: {
+        case FUSAIN_MSG_EMERGENCY_STOP: {
             trigger_emergency_stop();
             break;
         }
@@ -640,14 +640,14 @@ void process_command(const helios_packet_t* packet) {
   - Reset decoder after timeout period
 
 **4. Buffer overflow during encoding**
-- **Symptom:** `helios_encode_packet()` returns negative error
-- **Solution:** Ensure output buffer is at least `HELIOS_MAX_PACKET_SIZE * 2` bytes
+- **Symptom:** `fusain_encode_packet()` returns negative error
+- **Solution:** Ensure output buffer is at least `FUSAIN_MAX_PACKET_SIZE * 2` bytes
 
 **5. Telemetry bundle encoding fails**
-- **Symptom:** `helios_create_telemetry_bundle()` returns `-1` or `-2`
+- **Symptom:** `fusain_create_telemetry_bundle()` returns `-1` or `-2`
 - **Solution:**
   - Verify `motor_count` and `temp_count` are in range 1-3
-  - Check that combined size doesn't exceed `HELIOS_MAX_PAYLOAD_SIZE` (58 bytes)
+  - Check that combined size doesn't exceed `FUSAIN_MAX_PAYLOAD_SIZE` (58 bytes)
 
 ---
 
@@ -657,24 +657,24 @@ void process_command(const helios_packet_t* packet) {
 
 ```c
 // ✅ GOOD - Proper buffer sizing
-uint8_t tx_buffer[HELIOS_MAX_PACKET_SIZE * 2];  // Account for byte stuffing
+uint8_t tx_buffer[FUSAIN_MAX_PACKET_SIZE * 2];  // Account for byte stuffing
 
 // ❌ BAD - Insufficient buffer
-uint8_t tx_buffer[HELIOS_MAX_PACKET_SIZE];      // May overflow with stuffing
+uint8_t tx_buffer[FUSAIN_MAX_PACKET_SIZE];      // May overflow with stuffing
 ```
 
 ### 2. Error Handling
 
 ```c
 // ✅ GOOD - Check all return values
-int len = helios_encode_packet(&packet, buffer, sizeof(buffer));
+int len = fusain_encode_packet(&packet, buffer, sizeof(buffer));
 if (len < 0) {
     log_error("Encoding failed: %d", len);
     return;
 }
 
 // ❌ BAD - Ignoring errors
-helios_encode_packet(&packet, buffer, sizeof(buffer));
+fusain_encode_packet(&packet, buffer, sizeof(buffer));
 uart_send(buffer, 64);  // Wrong! May send garbage
 ```
 
@@ -684,7 +684,7 @@ uart_send(buffer, 64);  // Wrong! May send garbage
 // ✅ GOOD - One decoder per connection
 typedef struct {
     uint8_t state;
-    uint8_t buffer[HELIOS_MAX_PACKET_SIZE];
+    uint8_t buffer[FUSAIN_MAX_PACKET_SIZE];
     size_t buffer_index;
     bool escape_next;
 } connection_t;
@@ -697,13 +697,13 @@ static uint8_t decoder_state;  // Race conditions!
 
 ```c
 // ✅ GOOD - Reset decoder after errors
-if (result != HELIOS_DECODE_OK && result != HELIOS_DECODE_INCOMPLETE) {
+if (result != FUSAIN_DECODE_OK && result != FUSAIN_DECODE_INCOMPLETE) {
     log_error("Decode error: %d", result);
-    helios_reset_decoder(&state, &index, &escape);
+    fusain_reset_decoder(&state, &index, &escape);
 }
 
 // ❌ BAD - Continue after error
-if (result == HELIOS_DECODE_INVALID_CRC) {
+if (result == FUSAIN_DECODE_INVALID_CRC) {
     // Decoder still in invalid state!
 }
 ```
@@ -717,11 +717,11 @@ if (result == HELIOS_DECODE_INVALID_CRC) {
 1. **Define message type in header:**
 
 ```c
-// In helios_serial.h
+// In fusain_serial.h
 typedef enum {
     // ... existing types ...
-    HELIOS_MSG_NEW_COMMAND = 0x16,
-} helios_msg_type_t;
+    FUSAIN_MSG_NEW_COMMAND = 0x16,
+} fusain_msg_type_t;
 ```
 
 2. **Define payload structure:**
@@ -730,22 +730,22 @@ typedef enum {
 typedef struct __attribute__((packed)) {
     uint32_t field1;
     uint8_t field2;
-} helios_cmd_new_command_t;
+} fusain_cmd_new_command_t;
 ```
 
 3. **Create helper function (optional):**
 
 ```c
-// In helios_serial.c
-void helios_create_new_command(helios_packet_t* packet,
+// In fusain_serial.c
+void fusain_create_new_command(fusain_packet_t* packet,
                                uint32_t field1,
                                uint8_t field2) {
-    helios_cmd_new_command_t cmd = {
+    fusain_cmd_new_command_t cmd = {
         .field1 = field1,
         .field2 = field2
     };
     packet->length = sizeof(cmd);
-    packet->msg_type = HELIOS_MSG_NEW_COMMAND;
+    packet->msg_type = FUSAIN_MSG_NEW_COMMAND;
     memcpy(packet->payload, &cmd, sizeof(cmd));
 }
 ```

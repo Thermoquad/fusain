@@ -1,8 +1,8 @@
 # Fusain Utility Library
 
-Reusable C library for encoding and decoding Helios serial protocol packets.
+Reusable C library for encoding and decoding Fusain serial protocol packets.
 
-**Fusain** (fossilized charcoal) provides a platform-independent implementation of the Helios communication protocol.
+**Fusain** (fossilized charcoal) provides a platform-independent implementation of the Fusain communication protocol.
 
 ## Features
 
@@ -38,14 +38,14 @@ CONFIG_FUSAIN=y
 ### Encoding Example
 
 ```c
-helios_packet_t packet;
-uint8_t tx_buffer[HELIOS_MAX_PACKET_SIZE * 2];
+fusain_packet_t packet;
+uint8_t tx_buffer[FUSAIN_MAX_PACKET_SIZE * 2];
 
 // Create a ping request
-helios_create_ping_request(&packet);
+fusain_create_ping_request(&packet);
 
 // Encode to byte buffer
-int len = helios_encode_packet(&packet, tx_buffer, sizeof(tx_buffer));
+int len = fusain_encode_packet(&packet, tx_buffer, sizeof(tx_buffer));
 if (len < 0) {
     // Handle encoding error
 }
@@ -58,24 +58,24 @@ uart_send(tx_buffer, len);
 
 ```c
 // Decoder state (persistent)
-helios_decoder_t decoder;
+fusain_decoder_t decoder;
 
 // Initialize decoder
-helios_reset_decoder(&decoder);
+fusain_reset_decoder(&decoder);
 
 // Process incoming bytes
 while (uart_has_data()) {
     uint8_t byte = uart_read_byte();
-    helios_packet_t packet;
+    fusain_packet_t packet;
 
-    helios_decode_result_t result = helios_decode_byte(byte, &packet, &decoder);
+    fusain_decode_result_t result = fusain_decode_byte(byte, &packet, &decoder);
 
-    if (result == HELIOS_DECODE_OK) {
+    if (result == FUSAIN_DECODE_OK) {
         // Packet complete and valid
         process_packet(&packet);
-    } else if (result != HELIOS_DECODE_INCOMPLETE) {
+    } else if (result != FUSAIN_DECODE_INCOMPLETE) {
         // Decode error - reset decoder
-        helios_reset_decoder(&decoder);
+        fusain_reset_decoder(&decoder);
     }
 }
 ```
@@ -86,70 +86,70 @@ while (uart_has_data()) {
 
 **CRC Calculation:**
 ```c
-uint16_t helios_crc16(const uint8_t* data, size_t length);
+uint16_t fusain_crc16(const uint8_t* data, size_t length);
 ```
 
 **Packet Encoding:**
 ```c
-int helios_encode_packet(const helios_packet_t* packet, uint8_t* buffer, size_t buffer_size);
+int fusain_encode_packet(const fusain_packet_t* packet, uint8_t* buffer, size_t buffer_size);
 ```
 Returns number of bytes written, or negative error code.
 
 **Packet Decoding:**
 ```c
-helios_decode_result_t helios_decode_byte(
+fusain_decode_result_t fusain_decode_byte(
     uint8_t rx_byte,
-    helios_packet_t* packet,
-    helios_decoder_t* decoder
+    fusain_packet_t* packet,
+    fusain_decoder_t* decoder
 );
 ```
-Returns: `HELIOS_DECODE_OK`, `HELIOS_DECODE_INCOMPLETE`, or error code.
+Returns: `FUSAIN_DECODE_OK`, `FUSAIN_DECODE_INCOMPLETE`, or error code.
 
 **Decoder Reset:**
 ```c
-void helios_reset_decoder(helios_decoder_t* decoder);
+void fusain_reset_decoder(fusain_decoder_t* decoder);
 ```
 
 ### Helper Functions
 
 The library provides helper functions for creating common message types:
 
-- `helios_create_set_mode()` - Set operating mode command
-- `helios_create_set_pump_rate()` - Set fuel pump rate command
-- `helios_create_set_target_rpm()` - Set target RPM command
-- `helios_create_ping_request()` - Ping request (heartbeat)
-- `helios_create_set_timeout_config()` - Configure timeout mode
-- `helios_create_emergency_stop()` - Emergency stop command
-- `helios_create_state_data()` - State and error data
-- `helios_create_ping_response()` - Ping response (heartbeat)
-- `helios_create_telemetry_bundle()` - Aggregated telemetry data
+- `fusain_create_set_mode()` - Set operating mode command
+- `fusain_create_set_pump_rate()` - Set fuel pump rate command
+- `fusain_create_set_target_rpm()` - Set target RPM command
+- `fusain_create_ping_request()` - Ping request (heartbeat)
+- `fusain_create_set_timeout_config()` - Configure timeout mode
+- `fusain_create_emergency_stop()` - Emergency stop command
+- `fusain_create_state_data()` - State and error data
+- `fusain_create_ping_response()` - Ping response (heartbeat)
+- `fusain_create_telemetry_bundle()` - Aggregated telemetry data
 
 See `include/fusain/fusain.h` for complete API documentation.
 
 ## Message Types
 
 ### Commands (Master → ICU)
-- `HELIOS_MSG_SET_MODE` - Set operating mode (idle, fan, heat, emergency)
-- `HELIOS_MSG_SET_PUMP_RATE` - Set fuel pump rate
-- `HELIOS_MSG_SET_TARGET_RPM` - Set target motor RPM
-- `HELIOS_MSG_PING_REQUEST` - Keepalive ping
-- `HELIOS_MSG_SET_TIMEOUT_CONFIG` - Configure timeout behavior
-- `HELIOS_MSG_EMERGENCY_STOP` - Immediate emergency stop
+- `FUSAIN_MSG_SET_MODE` - Set operating mode (idle, fan, heat, emergency)
+- `FUSAIN_MSG_SET_PUMP_RATE` - Set fuel pump rate
+- `FUSAIN_MSG_SET_TARGET_RPM` - Set target motor RPM
+- `FUSAIN_MSG_PING_REQUEST` - Keepalive ping
+- `FUSAIN_MSG_SET_TIMEOUT_CONFIG` - Configure timeout behavior
+- `FUSAIN_MSG_EMERGENCY_STOP` - Immediate emergency stop
 
 ### Data (ICU → Master)
-- `HELIOS_MSG_STATE_DATA` - Current state and error code
-- `HELIOS_MSG_MOTOR_DATA` - Motor telemetry (RPM, PWM, etc.)
-- `HELIOS_MSG_TEMPERATURE_DATA` - Temperature and PID status
-- `HELIOS_MSG_PUMP_DATA` - Pump status and pulse count
-- `HELIOS_MSG_GLOW_DATA` - Glow plug status
-- `HELIOS_MSG_TELEMETRY_BUNDLE` - Aggregated telemetry (multiple motors/temps)
-- `HELIOS_MSG_PING_RESPONSE` - Ping response with uptime
+- `FUSAIN_MSG_STATE_DATA` - Current state and error code
+- `FUSAIN_MSG_MOTOR_DATA` - Motor telemetry (RPM, PWM, etc.)
+- `FUSAIN_MSG_TEMPERATURE_DATA` - Temperature and PID status
+- `FUSAIN_MSG_PUMP_DATA` - Pump status and pulse count
+- `FUSAIN_MSG_GLOW_DATA` - Glow plug status
+- `FUSAIN_MSG_TELEMETRY_BUNDLE` - Aggregated telemetry (multiple motors/temps)
+- `FUSAIN_MSG_PING_RESPONSE` - Ping response with uptime
 
 ### Errors (Bidirectional)
-- `HELIOS_MSG_ERROR_INVALID_COMMAND` - Unrecognized command
-- `HELIOS_MSG_ERROR_INVALID_CRC` - CRC mismatch
-- `HELIOS_MSG_ERROR_INVALID_LENGTH` - Payload length error
-- `HELIOS_MSG_ERROR_TIMEOUT` - Communication timeout
+- `FUSAIN_MSG_ERROR_INVALID_COMMAND` - Unrecognized command
+- `FUSAIN_MSG_ERROR_INVALID_CRC` - CRC mismatch
+- `FUSAIN_MSG_ERROR_INVALID_LENGTH` - Payload length error
+- `FUSAIN_MSG_ERROR_TIMEOUT` - Communication timeout
 
 ## Architecture
 
@@ -159,9 +159,9 @@ The library is designed for master/slave communication:
 
 ### Thread Safety
 
-The encoder (`helios_encode_packet()`) is stateless and thread-safe.
+The encoder (`fusain_encode_packet()`) is stateless and thread-safe.
 
-The decoder (`helios_decode_byte()`) requires per-connection state and is NOT thread-safe. Use separate decoder instances for each connection or protect with mutexes.
+The decoder (`fusain_decode_byte()`) requires per-connection state and is NOT thread-safe. Use separate decoder instances for each connection or protect with mutexes.
 
 ### Platform Independence
 

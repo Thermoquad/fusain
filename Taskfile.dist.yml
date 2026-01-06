@@ -6,11 +6,11 @@ env:
   BOARD: native_sim
 
 tasks:
-  build-firmware:
+  build:
     desc: Build the Fusain library for native_sim
     cmd: west build -b native_sim
 
-  rebuild-firmware:
+  rebuild:
     desc: Rebuild the Fusain library from scratch
     cmd: west build -b native_sim -p always
 
@@ -126,7 +126,7 @@ tasks:
       - echo "This will take several minutes. Please be patient."
       - task: test
         vars:
-          CLI_ARGS: "1000000"
+          CLI_ARGS: "5000000"
 
   install-git-hooks:
     desc: Install pre-commit hook that runs CI tests
