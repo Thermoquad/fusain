@@ -1,4 +1,4 @@
-# Fusain Utility Library
+# Fusain Protocol Library
 
 Reusable C library for encoding and decoding Fusain serial protocol packets.
 
@@ -9,25 +9,65 @@ Reusable C library for encoding and decoding Fusain serial protocol packets.
 - **CRC-16-CCITT** error detection (polynomial 0x1021, initial 0xFFFF)
 - **Byte stuffing** for packet framing
 - **Stateful decoder** for streaming byte-by-byte decoding
+- **64-bit addressing** for multi-device networks
 - **Pure C implementation** - zero dependencies beyond standard C library
 - **Portable** - works on embedded systems and host applications
-- **No Zephyr dependencies** - can be used outside Zephyr RTOS
 
 ## Protocol Overview
 
 - **Framing:** START (0x7E) ... END (0x7F) with escape byte (0x7D) for byte stuffing
-- **Structure:** START + LENGTH + TYPE + PAYLOAD + CRC(2 bytes) + END
-- **Max packet size:** 64 bytes (including overhead)
-- **Max payload size:** 58 bytes
-- **Message types:** Commands (master → ICU), Data (ICU → master), Errors (bidirectional)
+- **Structure:** START + LENGTH + ADDRESS(8) + MSG_TYPE + PAYLOAD + CRC(2) + END
+- **Max packet size:** 128 bytes (14 overhead + 114 payload)
+- **Max payload size:** 114 bytes
+- **Message types:** Configuration, Control, Telemetry, Errors
 
-## Usage
+## Build Modes
 
-### Enable in Kconfig
+This library supports two build modes:
 
+### 1. Zephyr Mode (Embedded)
+
+When built within a Zephyr environment, the library is automatically detected as a Zephyr module.
+
+**Enable in prj.conf:**
 ```kconfig
 CONFIG_FUSAIN=y
 ```
+
+**Add module to application CMakeLists.txt:**
+```cmake
+list(APPEND EXTRA_ZEPHYR_MODULES ${CMAKE_CURRENT_SOURCE_DIR}/../../modules/lib/fusain)
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+```
+
+### 2. Standalone Mode (Desktop/Other Platforms)
+
+For non-Zephyr applications, build as a standard CMake library:
+
+**Build the library:**
+```bash
+cmake -B build
+cmake --build build
+```
+
+**Install (optional):**
+```bash
+cmake --install build --prefix /usr/local
+```
+
+**Use with find_package:**
+```cmake
+find_package(fusain REQUIRED)
+target_link_libraries(myapp PRIVATE Fusain::fusain)
+```
+
+**Or add as subdirectory:**
+```cmake
+add_subdirectory(path/to/fusain)
+target_link_libraries(myapp PRIVATE Fusain::fusain)
+```
+
+## Usage
 
 ### Include Header
 
@@ -40,9 +80,10 @@ CONFIG_FUSAIN=y
 ```c
 fusain_packet_t packet;
 uint8_t tx_buffer[FUSAIN_MAX_PACKET_SIZE * 2];
+uint64_t device_address = 0x0123456789ABCDEF;
 
 // Create a ping request
-fusain_create_ping_request(&packet);
+fusain_create_ping_request(&packet, device_address);
 
 // Encode to byte buffer
 int len = fusain_encode_packet(&packet, tx_buffer, sizeof(tx_buffer));
@@ -114,48 +155,73 @@ void fusain_reset_decoder(fusain_decoder_t* decoder);
 
 The library provides helper functions for creating common message types:
 
+**Control Commands:**
 - `fusain_create_set_mode()` - Set operating mode command
-- `fusain_create_set_pump_rate()` - Set fuel pump rate command
-- `fusain_create_set_target_rpm()` - Set target RPM command
+- `fusain_create_pump_command()` - Set fuel pump rate command
+- `fusain_create_motor_command()` - Set target RPM command
+- `fusain_create_glow_command()` - Glow plug control command
+- `fusain_create_temp_command()` - Temperature control command
 - `fusain_create_ping_request()` - Ping request (heartbeat)
-- `fusain_create_set_timeout_config()` - Configure timeout mode
-- `fusain_create_emergency_stop()` - Emergency stop command
+- `fusain_create_send_telemetry()` - Request telemetry (polling mode)
+
+**Configuration Commands:**
+- `fusain_create_motor_config()` - Configure motor controller
+- `fusain_create_pump_config()` - Configure pump controller
+- `fusain_create_temp_config()` - Configure temperature controller
+- `fusain_create_glow_config()` - Configure glow plug
+- `fusain_create_telemetry_config()` - Configure telemetry broadcasts
+- `fusain_create_timeout_config()` - Configure communication timeout
+- `fusain_create_data_subscription()` - Subscribe to appliance data
+- `fusain_create_data_unsubscribe()` - Unsubscribe from appliance data
+- `fusain_create_discovery_request()` - Request device capabilities
+
+**Data Messages:**
 - `fusain_create_state_data()` - State and error data
 - `fusain_create_ping_response()` - Ping response (heartbeat)
-- `fusain_create_telemetry_bundle()` - Aggregated telemetry data
+- `fusain_create_device_announce()` - Device capabilities announcement
 
 See `include/fusain/fusain.h` for complete API documentation.
 
 ## Message Types
 
-### Commands (Master → ICU)
-- `FUSAIN_MSG_SET_MODE` - Set operating mode (idle, fan, heat, emergency)
-- `FUSAIN_MSG_SET_PUMP_RATE` - Set fuel pump rate
-- `FUSAIN_MSG_SET_TARGET_RPM` - Set target motor RPM
-- `FUSAIN_MSG_PING_REQUEST` - Keepalive ping
-- `FUSAIN_MSG_SET_TIMEOUT_CONFIG` - Configure timeout behavior
-- `FUSAIN_MSG_EMERGENCY_STOP` - Immediate emergency stop
+### Configuration Commands (0x10-0x1F)
+- `FUSAIN_MSG_MOTOR_CONFIG` - Configure motor controller parameters
+- `FUSAIN_MSG_PUMP_CONFIG` - Configure pump controller parameters
+- `FUSAIN_MSG_TEMP_CONFIG` - Configure temperature controller parameters
+- `FUSAIN_MSG_GLOW_CONFIG` - Configure glow plug parameters
+- `FUSAIN_MSG_DATA_SUBSCRIPTION` - Subscribe to appliance data
+- `FUSAIN_MSG_DATA_UNSUBSCRIBE` - Unsubscribe from appliance data
+- `FUSAIN_MSG_TELEMETRY_CONFIG` - Enable/disable telemetry broadcasts
+- `FUSAIN_MSG_TIMEOUT_CONFIG` - Configure communication timeout
+- `FUSAIN_MSG_DISCOVERY_REQUEST` - Request device capabilities
 
-### Data (ICU → Master)
-- `FUSAIN_MSG_STATE_DATA` - Current state and error code
-- `FUSAIN_MSG_MOTOR_DATA` - Motor telemetry (RPM, PWM, etc.)
-- `FUSAIN_MSG_TEMPERATURE_DATA` - Temperature and PID status
-- `FUSAIN_MSG_PUMP_DATA` - Pump status and pulse count
+### Control Commands (0x20-0x2F)
+- `FUSAIN_MSG_STATE_COMMAND` - Set system mode/state
+- `FUSAIN_MSG_MOTOR_COMMAND` - Set motor RPM
+- `FUSAIN_MSG_PUMP_COMMAND` - Set pump rate
+- `FUSAIN_MSG_GLOW_COMMAND` - Control glow plug
+- `FUSAIN_MSG_TEMP_COMMAND` - Temperature controller control
+- `FUSAIN_MSG_SEND_TELEMETRY` - Request telemetry (polling mode)
+- `FUSAIN_MSG_PING_REQUEST` - Heartbeat/connectivity check
+
+### Telemetry Data (0x30-0x3F)
+- `FUSAIN_MSG_STATE_DATA` - System state and status
+- `FUSAIN_MSG_MOTOR_DATA` - Motor telemetry
+- `FUSAIN_MSG_PUMP_DATA` - Pump status and events
 - `FUSAIN_MSG_GLOW_DATA` - Glow plug status
-- `FUSAIN_MSG_TELEMETRY_BUNDLE` - Aggregated telemetry (multiple motors/temps)
-- `FUSAIN_MSG_PING_RESPONSE` - Ping response with uptime
+- `FUSAIN_MSG_TEMP_DATA` - Temperature readings
+- `FUSAIN_MSG_DEVICE_ANNOUNCE` - Device capabilities announcement
+- `FUSAIN_MSG_PING_RESPONSE` - Heartbeat response
 
-### Errors (Bidirectional)
-- `FUSAIN_MSG_ERROR_INVALID_COMMAND` - Unrecognized command
-- `FUSAIN_MSG_ERROR_INVALID_CRC` - CRC mismatch
-- `FUSAIN_MSG_ERROR_INVALID_LENGTH` - Payload length error
-- `FUSAIN_MSG_ERROR_TIMEOUT` - Communication timeout
+### Error Messages (0xE0-0xEF)
+- `FUSAIN_MSG_ERROR_INVALID_CMD` - Command validation failed
+- `FUSAIN_MSG_ERROR_STATE_REJECT` - Command rejected by state machine
 
 ## Architecture
 
-The library is designed for master/slave communication:
-- **Master** (controller) - Sends commands, receives data
-- **Slave** (ICU firmware) - Receives commands, sends data
+The library is designed for controller/appliance communication:
+- **Controller** - Sends commands, receives telemetry
+- **Appliance** (ICU firmware) - Receives commands, sends telemetry
 
 ### Thread Safety
 
@@ -169,7 +235,6 @@ The library uses only standard C types and functions:
 - `<stdbool.h>`, `<stddef.h>`, `<stdint.h>`, `<string.h>`
 - No dynamic allocation
 - No platform-specific code
-- No Zephyr dependencies
 
 Can be compiled for:
 - Embedded systems (ARM, RISC-V, etc.)
@@ -178,15 +243,41 @@ Can be compiled for:
 
 ## Testing
 
-The library has been tested with:
-- Raspberry Pi Pico 2 (RP2350A, Cortex-M33)
-- Zephyr RTOS v4.3.0+
-- 115200 baud UART communication
-- Extended burn testing (Helios ICU firmware)
+The library includes comprehensive tests:
+- Functional tests (encoding, decoding, packet creation)
+- Fuzz tests (random data, edge cases)
+
+### Zephyr Tests (with Twister)
+
+```bash
+task test              # Run all tests with Twister
+task test-functional   # Run functional tests only
+task test-fuzz         # Run fuzz tests only
+task test -- 5000      # Run with custom fuzz round count
+```
+
+### Standalone Tests (no Zephyr required)
+
+```bash
+task standalone-test          # Run all standalone tests
+task standalone-test-verbose  # Run with detailed output
+task standalone-coverage      # Run with coverage report (requires gcovr)
+task standalone-ci            # Run format check + tests
+```
+
+### Coverage
+
+Standalone tests achieve **100% code coverage**. Generate a report with:
+
+```bash
+task standalone-coverage
+```
+
+Requires `gcovr` (`pip install gcovr`).
 
 ## Integration with Applications
 
-### ICU Firmware (Zephyr)
+### Appliance Firmware (Zephyr)
 The ICU-specific UART handler integrates this library with:
 - Zephyr UART drivers (interrupt-driven RX, polling TX)
 - Zbus message bus for inter-thread communication
@@ -199,7 +290,7 @@ Controller implementations should:
 - Use this library for protocol encoding/decoding
 - Implement UART/serial communication (platform-specific)
 - Send periodic PING_REQUEST to maintain connection
-- Handle TELEMETRY_BUNDLE messages for monitoring
+- Handle telemetry messages for monitoring
 
 ## License
 
@@ -210,5 +301,5 @@ Copyright (c) 2025 Kaz Walker, Thermoquad
 ## References
 
 - **Helios ICU Firmware:** `apps/helios/` - Reference implementation
-- **Protocol Documentation:** `apps/helios/docs/serial_protocol.md`
+- **Protocol Specification:** `origin/documentation/source/specifications/fusain/`
 - **CRC-16-CCITT:** Polynomial 0x1021, initial value 0xFFFF

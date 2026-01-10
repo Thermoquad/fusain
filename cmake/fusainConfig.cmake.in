@@ -1,0 +1,17 @@
+# Copyright (c) 2025 Kaz Walker, Thermoquad
+# SPDX-License-Identifier: Apache-2.0
+#
+# Fusain CMake Package Configuration
+#
+# This file is used by find_package(fusain) to locate the installed library.
+#
+# Usage:
+#   find_package(fusain REQUIRED)
+#   target_link_libraries(my_app PRIVATE Fusain::fusain)
+#
+
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/fusainTargets.cmake")
+
+check_required_components(fusain)

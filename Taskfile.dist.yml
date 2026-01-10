@@ -99,12 +99,13 @@ tasks:
     desc: Format C source files using clang-format
     cmds:
       - clang-format -i src/*.c include/fusain/*.h tests/src/*.c
+      - clang-format -i tests/standalone/*.c tests/standalone/zephyr/*.h
 
   format-check:
     desc: Check if C source files are formatted correctly
     cmds:
       - |
-        RESULT=$(clang-format --dry-run --Werror src/*.c include/fusain/*.h tests/src/*.c 2>&1)
+        RESULT=$(clang-format --dry-run --Werror src/*.c include/fusain/*.h tests/src/*.c tests/standalone/*.c tests/standalone/zephyr/*.h 2>&1)
         if [ $? -ne 0 ]; then
           echo "Formatting issues found:"
           echo "$RESULT"
@@ -154,3 +155,80 @@ tasks:
         echo ""
         echo "To skip the hook for a commit, use: git commit --no-verify"
         echo "To uninstall: rm .git/hooks/pre-commit"
+
+  # ============================================================
+  # Standalone Mode Tasks (no Zephyr required)
+  # ============================================================
+
+  standalone-build:
+    desc: Build the standalone fusain library (no Zephyr)
+    cmds:
+      - cmake -B build-standalone -DFUSAIN_BUILD_TESTS=OFF
+      - cmake --build build-standalone
+
+  standalone-build-tests:
+    desc: Build the standalone library with tests
+    cmds:
+      - cmake -B build-standalone -DFUSAIN_BUILD_TESTS=ON
+      - cmake --build build-standalone
+
+  standalone-test:
+    desc: Run standalone tests (no Zephyr)
+    deps: [standalone-build-tests]
+    cmd: ctest --test-dir build-standalone --output-on-failure
+
+  standalone-test-verbose:
+    desc: Run standalone tests with verbose output
+    deps: [standalone-build-tests]
+    cmd: build-standalone/tests/standalone/fusain_tests
+
+  standalone-clean:
+    desc: Clean standalone build artifacts
+    cmds:
+      - rm -rf build-standalone
+      - rm -rf coverage-standalone
+
+  standalone-coverage:
+    desc: Run standalone tests with coverage report (using gcovr)
+    cmds:
+      - mkdir -p coverage-standalone
+      - cmake -B build-standalone -DFUSAIN_BUILD_TESTS=ON -DCMAKE_C_FLAGS="--coverage -fprofile-arcs -ftest-coverage"
+      - cmake --build build-standalone
+      - build-standalone/tests/standalone/fusain_tests
+      - |
+        echo ""
+        echo "Coverage report:"
+        gcovr --root . --filter src/ build-standalone 2>/dev/null || \
+        (echo "gcovr not found. Install with: pip install gcovr" && \
+         echo "Falling back to basic gcov..." && \
+         cd build-standalone/CMakeFiles/fusain.dir/src && gcov fusain.c.gcno && cat fusain.c.gcov | head -100)
+
+  standalone-coverage-check:
+    desc: Verify 100% test coverage (fails if coverage < 100%)
+    cmds:
+      - mkdir -p coverage-standalone
+      - cmake -B build-standalone -DFUSAIN_BUILD_TESTS=ON -DCMAKE_C_FLAGS="--coverage -fprofile-arcs -ftest-coverage"
+      - cmake --build build-standalone
+      - build-standalone/tests/standalone/fusain_tests
+      - |
+        echo ""
+        echo "Checking coverage (must be 100%)..."
+        gcovr --root . --filter src/ --fail-under-line 100 build-standalone
+        if [ $? -eq 0 ]; then
+          echo "Coverage check passed: 100% line coverage"
+        else
+          echo ""
+          echo "Coverage check FAILED: coverage is below 100%"
+          exit 1
+        fi
+
+  standalone-ci:
+    desc: Run standalone CI checks - format, tests, and 100% coverage
+    cmds:
+      - echo "Running fusain standalone CI checks..."
+      - echo ""
+      - task: format-check
+      - echo ""
+      - task: standalone-coverage-check
+      - echo ""
+      - echo "Standalone CI checks passed!"

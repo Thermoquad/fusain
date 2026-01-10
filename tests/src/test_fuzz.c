@@ -338,8 +338,8 @@ ZTEST(fusain_fuzz, test_fuzz_v2_packets)
     case 1: {
       fusain_cmd_pump_config_t config = {
         .pump = fuzz_rand(),
-        .min_rate_ms = fuzz_rand(),
-        .max_rate_ms = fuzz_rand(),
+        .pulse_ms = fuzz_rand(),
+        .recovery_ms = fuzz_rand(),
       };
       fusain_create_pump_config(&packet, 0, &config);
       break;
@@ -365,8 +365,8 @@ ZTEST(fusain_fuzz, test_fuzz_v2_packets)
       break;
     }
     case 4:
-      fusain_create_data_subscription(&packet, 0, (uint64_t)fuzz_rand() << 32 | fuzz_rand(),
-          fuzz_rand());
+      fusain_create_data_subscription(
+          &packet, 0, (uint64_t)fuzz_rand() << 32 | fuzz_rand());
       break;
     case 5:
       fusain_create_data_unsubscribe(
@@ -376,8 +376,8 @@ ZTEST(fusain_fuzz, test_fuzz_v2_packets)
       fusain_create_discovery_request(&packet, 0);
       break;
     case 7:
-      fusain_create_device_announce(&packet, 0, fuzz_rand(),
-          fuzz_rand());
+      fusain_create_device_announce(&packet, 0, fuzz_rand_byte(),
+          fuzz_rand_byte(), fuzz_rand_byte(), fuzz_rand_byte());
       break;
     }
 

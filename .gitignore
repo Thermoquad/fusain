@@ -8,6 +8,7 @@
 /twister-out/
 /twister-out.*/
 /tests/test_rounds.conf
+/coverage-*/
 
 # Task runner
 /Taskfile.y*ml

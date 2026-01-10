@@ -75,9 +75,7 @@ int fusain_encode_packet(const fusain_packet_t* packet, uint8_t* buffer,
   size_t index = 0;
 
   // START byte (never escaped)
-  if (index >= buffer_size) {
-    return -3;
-  }
+  // Note: buffer_size >= FUSAIN_MIN_PACKET_SIZE (14) guaranteed by check above
   buffer[index++] = FUSAIN_START_BYTE;
 
   // Calculate CRC over LENGTH + ADDRESS + TYPE + PAYLOAD
@@ -91,10 +89,8 @@ int fusain_encode_packet(const fusain_packet_t* packet, uint8_t* buffer,
   memcpy(&crc_data[10], packet->payload, packet->length);
   uint16_t crc = fusain_crc16(crc_data, packet->length + 10);
 
-  // Stuff LENGTH byte
-  if (stuff_byte(packet->length, buffer, buffer_size, &index) < 0) {
-    return -4;
-  }
+  // Write LENGTH byte directly (never needs escaping: 0-114 range, escape bytes are 125-127)
+  buffer[index++] = packet->length;
 
   // Stuff ADDRESS bytes (little-endian)
   for (int i = 0; i < 8; i++) {
@@ -259,26 +255,27 @@ void fusain_create_set_mode(fusain_packet_t* packet, uint64_t address,
     fusain_mode_t mode, uint32_t parameter)
 {
   packet->address = address;
-  fusain_cmd_set_mode_t cmd = { .mode = mode, .parameter = parameter };
+  fusain_cmd_set_mode_t cmd = { .mode = (uint32_t)mode, .argument = (int32_t)parameter };
   packet->length = sizeof(cmd);
   packet->msg_type = FUSAIN_MSG_STATE_COMMAND;
   memcpy(packet->payload, &cmd, sizeof(cmd));
 }
 
-void fusain_create_set_pump_rate(fusain_packet_t* packet, uint64_t address, uint32_t rate_ms)
+void fusain_create_pump_command(fusain_packet_t* packet, uint64_t address,
+    int32_t pump, int32_t rate_ms)
 {
-  fusain_cmd_set_pump_rate_t cmd = { .rate_ms = rate_ms };
   packet->address = address;
+  fusain_cmd_set_pump_rate_t cmd = { .pump = pump, .rate_ms = rate_ms };
   packet->length = sizeof(cmd);
   packet->msg_type = FUSAIN_MSG_PUMP_COMMAND;
   memcpy(packet->payload, &cmd, sizeof(cmd));
 }
 
-void fusain_create_set_target_rpm(fusain_packet_t* packet, uint64_t address,
-    uint32_t target_rpm)
+void fusain_create_motor_command(fusain_packet_t* packet, uint64_t address,
+    int32_t motor, int32_t rpm)
 {
   packet->address = address;
-  fusain_cmd_set_target_rpm_t cmd = { .target_rpm = target_rpm };
+  fusain_cmd_set_target_rpm_t cmd = { .motor = motor, .rpm = rpm };
   packet->length = sizeof(cmd);
   packet->msg_type = FUSAIN_MSG_MOTOR_COMMAND;
   memcpy(packet->payload, &cmd, sizeof(cmd));
@@ -294,6 +291,22 @@ void fusain_create_glow_command(fusain_packet_t* packet, uint64_t address, int32
   memcpy(packet->payload, &cmd, sizeof(cmd));
 }
 
+void fusain_create_temp_command(fusain_packet_t* packet, uint64_t address,
+    int32_t thermometer, fusain_temp_cmd_type_t type, int32_t motor_index,
+    double target_temp)
+{
+  packet->address = address;
+  fusain_cmd_temp_command_t cmd = {
+    .thermometer = thermometer,
+    .type = (uint32_t)type,
+    .motor_index = motor_index,
+    .target_temp = target_temp
+  };
+  packet->length = sizeof(cmd);
+  packet->msg_type = FUSAIN_MSG_TEMP_COMMAND;
+  memcpy(packet->payload, &cmd, sizeof(cmd));
+}
+
 void fusain_create_ping_request(fusain_packet_t* packet, uint64_t address)
 {
   packet->address = address;
@@ -302,79 +315,67 @@ void fusain_create_ping_request(fusain_packet_t* packet, uint64_t address)
 }
 
 void fusain_create_telemetry_config(fusain_packet_t* packet, uint64_t address, bool enabled,
-    uint32_t interval_ms, uint32_t mode)
+    uint32_t interval_ms)
 {
   packet->address = address;
-  fusain_cmd_telemetry_config_t cmd = { .telemetry_enabled = enabled ? 1 : 0,
-    .interval_ms = interval_ms,
-    .telemetry_mode = mode };
+  fusain_cmd_telemetry_config_t cmd = {
+    .telemetry_enabled = enabled ? 1 : 0,
+    .interval_ms = interval_ms
+  };
   packet->length = sizeof(cmd);
   packet->msg_type = FUSAIN_MSG_TELEMETRY_CONFIG;
   memcpy(packet->payload, &cmd, sizeof(cmd));
 }
 
-void fusain_create_state_data(fusain_packet_t* packet, uint64_t address,
-    fusain_state_t state, fusain_error_t error)
+void fusain_create_timeout_config(fusain_packet_t* packet, uint64_t address, bool enabled,
+    uint32_t timeout_ms)
 {
   packet->address = address;
-  fusain_data_state_t data = { .state = state, .error = error };
+  fusain_cmd_timeout_config_t cmd = {
+    .enabled = enabled ? 1 : 0,
+    .timeout_ms = timeout_ms
+  };
+  packet->length = sizeof(cmd);
+  packet->msg_type = FUSAIN_MSG_TIMEOUT_CONFIG;
+  memcpy(packet->payload, &cmd, sizeof(cmd));
+}
+
+void fusain_create_send_telemetry(fusain_packet_t* packet, uint64_t address,
+    uint32_t telemetry_type, uint32_t index)
+{
+  packet->address = address;
+  fusain_cmd_send_telemetry_t cmd = {
+    .telemetry_type = telemetry_type,
+    .index = index
+  };
+  packet->length = sizeof(cmd);
+  packet->msg_type = FUSAIN_MSG_SEND_TELEMETRY;
+  memcpy(packet->payload, &cmd, sizeof(cmd));
+}
+
+void fusain_create_state_data(fusain_packet_t* packet, uint64_t address,
+    uint32_t error, int32_t code, fusain_state_t state, uint32_t timestamp)
+{
+  packet->address = address;
+  fusain_data_state_t data = {
+    .error = error,
+    .code = code,
+    .state = (uint32_t)state,
+    .timestamp = timestamp
+  };
   packet->length = sizeof(data);
   packet->msg_type = FUSAIN_MSG_STATE_DATA;
   memcpy(packet->payload, &data, sizeof(data));
 }
 
 void fusain_create_ping_response(fusain_packet_t* packet, uint64_t address,
-    uint64_t uptime_ms)
+    uint32_t uptime_ms)
 {
   packet->address = address;
   fusain_data_ping_response_t data = { .uptime_ms = uptime_ms };
   packet->length = sizeof(data);
   packet->msg_type = FUSAIN_MSG_PING_RESPONSE;
   memcpy(packet->payload, &data, sizeof(data));
-}
-
-int fusain_create_telemetry_bundle(fusain_packet_t* packet, uint64_t address,
-    fusain_state_t state, fusain_error_t error,
-    const fusain_telemetry_motor_t* motors, uint8_t motor_count,
-    const fusain_telemetry_temperature_t* temperatures, uint8_t temp_count)
-{
-  packet->address = address;
-  // Validate counts
-  if (motor_count > FUSAIN_MAX_MOTORS || temp_count > FUSAIN_MAX_TEMPERATURES || motor_count == 0 || temp_count == 0) {
-    return -1;
-  }
-
-  // Calculate payload size
-  size_t payload_size = sizeof(fusain_data_telemetry_bundle_t) + (motor_count * sizeof(fusain_telemetry_motor_t)) + (temp_count * sizeof(fusain_telemetry_temperature_t));
-
-  if (payload_size > FUSAIN_MAX_PAYLOAD_SIZE) {
-    return -2; // Payload too large
-  }
-
-  // Build packet
-  fusain_data_telemetry_bundle_t bundle = {
-    .state = state,
-    .error = error,
-    .motor_count = motor_count,
-    .temp_count = temp_count,
-  };
-
-  uint8_t* payload_ptr = packet->payload;
-  memcpy(payload_ptr, &bundle, sizeof(bundle));
-  payload_ptr += sizeof(bundle);
-
-  // Copy motor data
-  memcpy(payload_ptr, motors, motor_count * sizeof(fusain_telemetry_motor_t));
-  payload_ptr += motor_count * sizeof(fusain_telemetry_motor_t);
-
-  // Copy temperature data
-  memcpy(payload_ptr, temperatures,
-      temp_count * sizeof(fusain_telemetry_temperature_t));
-
-  packet->length = (uint8_t)payload_size;
-  packet->msg_type = FUSAIN_MSG_TELEMETRY_BUNDLE;
-
-  return 0;
 }
 
 /* v2.0 Configuration Command Functions */
@@ -416,12 +417,11 @@ void fusain_create_glow_config(fusain_packet_t* packet, uint64_t address,
 }
 
 void fusain_create_data_subscription(fusain_packet_t* packet, uint64_t address,
-    uint64_t appliance_address, uint64_t message_filter)
+    uint64_t appliance_address)
 {
   packet->address = address;
   fusain_cmd_data_subscription_t cmd = {
-    .appliance_address = appliance_address,
-    .message_filter = message_filter
+    .appliance_address = appliance_address
   };
   packet->length = sizeof(cmd);
   packet->msg_type = FUSAIN_MSG_DATA_SUBSCRIPTION;
@@ -448,12 +448,16 @@ void fusain_create_discovery_request(fusain_packet_t* packet, uint64_t address)
 }
 
 void fusain_create_device_announce(fusain_packet_t* packet, uint64_t address,
-    uint32_t device_type, uint32_t capabilities)
+    uint8_t motor_count, uint8_t thermometer_count, uint8_t pump_count,
+    uint8_t glow_count)
 {
   packet->address = address;
   fusain_data_device_announce_t data = {
-    .device_type = device_type,
-    .capabilities = capabilities
+    .motor_count = motor_count,
+    .thermometer_count = thermometer_count,
+    .pump_count = pump_count,
+    .glow_count = glow_count,
+    .padding = { 0 }
   };
   packet->length = sizeof(data);
   packet->msg_type = FUSAIN_MSG_DEVICE_ANNOUNCE;

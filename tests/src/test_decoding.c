@@ -154,7 +154,7 @@ ZTEST(fusain_decoding, test_roundtrip_max_payload)
 {
   fusain_packet_t tx_packet = {
     .length = FUSAIN_MAX_PAYLOAD_SIZE,
-    .msg_type = FUSAIN_MSG_TELEMETRY_BUNDLE,
+    .msg_type = FUSAIN_MSG_STATE_DATA,
   };
 
   /* Fill with pattern */
@@ -220,6 +220,112 @@ ZTEST(fusain_decoding, test_roundtrip_consistency)
     zassert_mem_equal(rx_packet.payload, tx_packet.payload, tx_packet.length,
         "Size %d: Payload should match", test_sizes[i]);
   }
+}
+
+/* Test decoder in IDLE state receiving non-START bytes (lines 168-170) */
+ZTEST(fusain_decoding, test_decode_idle_garbage)
+{
+  fusain_decoder_t decoder;
+  fusain_reset_decoder(&decoder);
+
+  fusain_packet_t rx_packet;
+  fusain_decode_result_t result;
+
+  /* Send various non-START bytes while in IDLE state */
+  result = fusain_decode_byte(0x00, &rx_packet, &decoder);
+  zassert_equal(result, FUSAIN_DECODE_INCOMPLETE,
+      "IDLE state should ignore non-START byte");
+
+  result = fusain_decode_byte(0xFF, &rx_packet, &decoder);
+  zassert_equal(result, FUSAIN_DECODE_INCOMPLETE,
+      "IDLE state should ignore non-START byte");
+
+  result = fusain_decode_byte(0x42, &rx_packet, &decoder);
+  zassert_equal(result, FUSAIN_DECODE_INCOMPLETE,
+      "IDLE state should ignore non-START byte");
+
+  /* Decoder should still be in IDLE and ready to accept START */
+  result = fusain_decode_byte(FUSAIN_START_BYTE, &rx_packet, &decoder);
+  zassert_equal(result, FUSAIN_DECODE_INCOMPLETE,
+      "Should accept START after garbage");
+}
+
+/* Test decoder receiving invalid length > 114 (lines 174-175) */
+ZTEST(fusain_decoding, test_decode_invalid_length)
+{
+  fusain_decoder_t decoder;
+  fusain_reset_decoder(&decoder);
+
+  fusain_packet_t rx_packet;
+  fusain_decode_result_t result;
+
+  /* Send START byte */
+  result = fusain_decode_byte(FUSAIN_START_BYTE, &rx_packet, &decoder);
+  zassert_equal(result, FUSAIN_DECODE_INCOMPLETE, "Should accept START");
+
+  /* Send invalid length (> 114) */
+  result = fusain_decode_byte(FUSAIN_MAX_PAYLOAD_SIZE + 1, &rx_packet, &decoder);
+  zassert_equal(result, FUSAIN_DECODE_INVALID_LENGTH,
+      "Should reject length > 114");
+
+  /* Decoder should be back in IDLE */
+  result = fusain_decode_byte(0x42, &rx_packet, &decoder);
+  zassert_equal(result, FUSAIN_DECODE_INCOMPLETE,
+      "Should be in IDLE after invalid length");
+}
+
+/* Test decoder expecting END but receiving wrong byte (lines 226-227) */
+ZTEST(fusain_decoding, test_decode_missing_end_byte)
+{
+  fusain_packet_t tx_packet = {
+    .length = 0,
+    .address = 0x0102030405060708,
+    .msg_type = FUSAIN_MSG_PING_REQUEST,
+  };
+
+  uint8_t buffer[FUSAIN_MAX_PACKET_SIZE * 2];
+  int encoded_len = fusain_encode_packet(&tx_packet, buffer, sizeof(buffer));
+  zassert_true(encoded_len > 0, "Encoding should succeed");
+
+  /* Replace END byte with something else */
+  buffer[encoded_len - 1] = 0x42;
+
+  fusain_decoder_t decoder;
+  fusain_reset_decoder(&decoder);
+
+  fusain_packet_t rx_packet;
+  fusain_decode_result_t result = FUSAIN_DECODE_INCOMPLETE;
+
+  for (int i = 0; i < encoded_len; i++) {
+    result = fusain_decode_byte(buffer[i], &rx_packet, &decoder);
+    if (result != FUSAIN_DECODE_INCOMPLETE) {
+      break;
+    }
+  }
+
+  zassert_equal(result, FUSAIN_DECODE_INVALID_START,
+      "Should fail when END byte is missing");
+}
+
+/* Test decoder with corrupted state (defensive code, lines 241-243) */
+ZTEST(fusain_decoding, test_decode_invalid_state)
+{
+  fusain_decoder_t decoder;
+  fusain_reset_decoder(&decoder);
+
+  /* Manually corrupt the decoder state to an invalid value */
+  decoder.state = 255; /* Invalid state value */
+
+  fusain_packet_t rx_packet;
+  fusain_decode_result_t result;
+
+  /* Send any byte - should trigger default case */
+  result = fusain_decode_byte(0x42, &rx_packet, &decoder);
+  zassert_equal(result, FUSAIN_DECODE_INVALID_START,
+      "Invalid state should return error");
+
+  /* Decoder should be reset to IDLE */
+  zassert_equal(decoder.state, 0, "Should reset to IDLE after invalid state");
 }
 
 /* Test suite setup */
