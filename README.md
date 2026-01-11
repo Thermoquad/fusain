@@ -180,8 +180,20 @@ The library provides helper functions for creating common message types:
 
 **Data Messages:**
 - `fusain_create_state_data()` - State and error data
+- `fusain_create_motor_data()` - Motor telemetry data
+- `fusain_create_pump_data()` - Pump telemetry data
+- `fusain_create_glow_data()` - Glow plug telemetry data
+- `fusain_create_temp_data()` - Temperature telemetry data
 - `fusain_create_ping_response()` - Ping response (heartbeat)
 - `fusain_create_device_announce()` - Device capabilities announcement
+
+**Error Messages:**
+- `fusain_create_error_invalid_cmd()` - Invalid command error response
+- `fusain_create_error_state_reject()` - State rejection error response
+
+**Net Buffer API (Zephyr only):**
+- `fusain_decode_byte_to_net_buf()` - Decode bytes with net_buf output
+- `fusain_packet_from_buf()` - Get packet pointer from net_buf
 
 See `include/fusain/fusain.h` for complete API documentation.
 
@@ -268,8 +280,10 @@ task test -- 5000      # Run with custom fuzz round count
 ```bash
 task standalone-test          # Run all standalone tests
 task standalone-test-verbose  # Run with detailed output
+task standalone-fuzz          # Run standalone fuzz tests (default: 1M rounds)
+task standalone-fuzz -- 5000  # Run with custom fuzz round count
 task standalone-coverage      # Run with coverage report (requires gcovr)
-task standalone-ci            # Run format check + tests
+task standalone-ci            # Run format check + tests + fuzz
 ```
 
 ### Coverage

@@ -342,9 +342,75 @@ void fusain_create_ping_response(fusain_packet_t* packet, uint64_t address,
 void fusain_create_device_announce(fusain_packet_t* packet, uint64_t address,
                                    uint8_t motor_count, uint8_t thermometer_count,
                                    uint8_t pump_count, uint8_t glow_count);
+
+void fusain_create_motor_data(fusain_packet_t* packet, uint64_t address,
+                              uint8_t motor, uint32_t timestamp, uint32_t rpm,
+                              uint32_t target, uint32_t pwm_duty);
+
+void fusain_create_pump_data(fusain_packet_t* packet, uint64_t address,
+                             uint8_t pump, uint32_t timestamp, uint32_t pulses);
+
+void fusain_create_glow_data(fusain_packet_t* packet, uint64_t address,
+                             uint8_t glow, uint32_t timestamp, bool active,
+                             uint32_t elapsed_ms);
+
+void fusain_create_temp_data(fusain_packet_t* packet, uint64_t address,
+                             uint8_t thermometer, uint32_t timestamp, double reading,
+                             bool temperature_rpm_control, int32_t watched_motor,
+                             double target_temperature);
+```
+
+#### Error Helpers
+
+```c
+void fusain_create_error_invalid_cmd(fusain_packet_t* packet, uint64_t address,
+                                     uint8_t rejected_type, const char* reason);
+
+void fusain_create_error_state_reject(fusain_packet_t* packet, uint64_t address,
+                                      uint8_t rejected_type, uint8_t current_state,
+                                      const char* reason);
 ```
 
 **Note:** All helpers populate the `packet` structure. You must still call `fusain_encode_packet()` to serialize for transmission.
+
+---
+
+#### Net Buffer API (Zephyr Only)
+
+When `CONFIG_FUSAIN_NET_BUF=y` (default when FUSAIN is enabled), the library provides
+a net_buf wrapper for convenient packet routing:
+
+```c
+#include <zephyr/net/buf.h>
+#include <fusain/fusain.h>
+
+struct net_buf *fusain_decode_byte_to_net_buf(uint8_t byte,
+                                              struct net_buf_pool *pool,
+                                              fusain_decoder_t *decoder);
+
+static inline fusain_packet_t *fusain_packet_from_buf(struct net_buf *buf);
+```
+
+**Usage Example:**
+
+```c
+NET_BUF_POOL_DEFINE(fusain_pool, 8, sizeof(fusain_packet_t), 0, NULL);
+
+static fusain_decoder_t decoder;
+
+void rx_handler(uint8_t byte) {
+    struct net_buf *buf = fusain_decode_byte_to_net_buf(byte,
+                                                        &fusain_pool,
+                                                        &decoder);
+    if (buf != NULL) {
+        fusain_packet_t *packet = fusain_packet_from_buf(buf);
+        // Process or route packet...
+        net_buf_unref(buf);
+    }
+}
+```
+
+This API enables zero-copy routing to Bluetooth, TCP, or other Zephyr subsystems.
 
 ---
 
@@ -596,8 +662,10 @@ task standalone-build         # Build library only
 task standalone-build-tests   # Build with tests
 task standalone-test          # Run tests via CTest
 task standalone-test-verbose  # Run with detailed output
+task standalone-fuzz          # Run standalone fuzz tests (default: 1M rounds)
+task standalone-fuzz -- 5000  # Run with custom fuzz round count
 task standalone-coverage      # Run with gcovr coverage report
-task standalone-ci            # Format check + tests
+task standalone-ci            # Format check + tests + fuzz (1M rounds)
 task standalone-clean         # Clean build artifacts
 ```
 
@@ -865,37 +933,6 @@ void fusain_create_new_command(fusain_packet_t* packet,
 
 ---
 
-## Version History
-
-- **v3.0.0** (2026-01-10) - CBOR payload encoding
-  - Replaced fixed-position binary payloads with CBOR encoding
-  - Wire format: `[START][LENGTH][ADDRESS][CBOR_PAYLOAD][CRC][END]`
-  - CBOR message structure: `[msg_type, payload_map]` or `[msg_type, nil]`
-  - Message type embedded in CBOR array instead of separate wire field
-  - Added zcbor-generated encode/decode code from CDDL schema
-  - All `fusain_create_*()` helpers updated for CBOR encoding
-  - Tests updated for CBOR round-trip verification
-  - Schema location: `origin/documentation/source/specifications/fusain/fusain.cddl`
-
-- **v1.1.0** (2025-01-09) - Dual-mode CMake build
-  - Added standalone CMake build mode (no Zephyr required)
-  - Added `find_package(fusain)` support for CMake integration
-  - Added standalone test infrastructure with ztest compatibility layer
-  - Added `task standalone-*` commands for standalone builds
-  - Added gcovr-based coverage reporting (100% coverage)
-  - Existing Zephyr module integration unchanged
-
-- **v1.0.0** (2025-01-01) - Initial release
-  - Pure C implementation
-  - CRC-16-CCITT error detection
-  - Byte stuffing for framing
-  - Support for 6 command types, 7 data types, 4 error types
-  - Helper functions for common messages
-  - Zephyr module integration
-  - Apache-2.0 license
-
----
-
 ## References
 
 - **Protocol Specification:** `origin/documentation/source/specifications/fusain/` (canonical Sphinx docs)
@@ -924,6 +961,6 @@ To reload all organization CLAUDE.md files or run a content integrity check, see
 
 ---
 
-**Last Updated:** 2026-01-10
+**Last Updated:** 2026-01-11
 
 **Maintainer:** Kaz Walker
