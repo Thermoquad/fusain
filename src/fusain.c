@@ -10,10 +10,10 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "generated/fusain_cbor_decode.h"
-#include "generated/fusain_cbor_encode.h"
-#include "generated/fusain_cbor_types.h"
 #include <fusain/fusain.h>
+#include <fusain/generated/cbor_decode.h>
+#include <fusain/generated/cbor_encode.h>
+#include <fusain/generated/cbor_types.h>
 
 #ifdef CONFIG_FUSAIN
 #include <zephyr/sys/crc.h>

@@ -4,14 +4,14 @@
  * Generated with a --default-max-qty of 3
  */
 
-#ifndef FUSAIN_CBOR_DECODE_H__
-#define FUSAIN_CBOR_DECODE_H__
+#ifndef CBOR_DECODE_H__
+#define CBOR_DECODE_H__
 
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
-#include "fusain_cbor_types.h"
+#include "cbor_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -158,4 +158,4 @@ int cbor_decode_error_state_reject_payload(
 }
 #endif
 
-#endif /* FUSAIN_CBOR_DECODE_H__ */
+#endif /* CBOR_DECODE_H__ */

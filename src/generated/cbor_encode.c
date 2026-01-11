@@ -8,9 +8,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
-#include "zcbor_encode.h"
-#include "fusain_cbor_encode.h"
-#include "zcbor_print.h"
+#include <zcbor_encode.h>
+#include <zcbor_print.h>
+#include <fusain/generated/cbor_encode.h>
 
 #if DEFAULT_MAX_QTY != 3
 #error "The type file was generated with a different default_max_qty than this file"

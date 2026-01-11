@@ -4,8 +4,8 @@
  * Generated with a --default-max-qty of 3
  */
 
-#ifndef FUSAIN_CBOR_TYPES_H__
-#define FUSAIN_CBOR_TYPES_H__
+#ifndef CBOR_TYPES_H__
+#define CBOR_TYPES_H__
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -288,4 +288,4 @@ struct error_state_reject_payload {
 }
 #endif
 
-#endif /* FUSAIN_CBOR_TYPES_H__ */
+#endif /* CBOR_TYPES_H__ */

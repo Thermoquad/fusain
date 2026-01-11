@@ -21,17 +21,18 @@ if(ZEPHYR_BASE)
   if(CONFIG_FUSAIN)
     set(ZEPHYR_CURRENT_LIBRARY fusain)
     zephyr_include_directories(${ZEPHYR_CURRENT_MODULE_DIR}/include)
-    zephyr_include_directories(${ZEPHYR_CURRENT_MODULE_DIR}/src/generated)
     zephyr_library()
-    zephyr_library_sources(
-      ${ZEPHYR_CURRENT_MODULE_DIR}/src/fusain.c
-      ${ZEPHYR_CURRENT_MODULE_DIR}/src/generated/fusain_cbor_encode.c
-      ${ZEPHYR_CURRENT_MODULE_DIR}/src/generated/fusain_cbor_decode.c
-    )
+
+    # Glob all source files recursively
+    file(GLOB_RECURSE FUSAIN_ZEPHYR_SOURCES ${ZEPHYR_CURRENT_MODULE_DIR}/src/*.c)
+
+    # Exclude fusain_net_buf.c - added conditionally below
+    list(FILTER FUSAIN_ZEPHYR_SOURCES EXCLUDE REGEX "fusain_net_buf\\.c$")
+
+    zephyr_library_sources(${FUSAIN_ZEPHYR_SOURCES})
+
     if(CONFIG_FUSAIN_NET_BUF)
-      zephyr_library_sources(
-        ${ZEPHYR_CURRENT_MODULE_DIR}/src/fusain_net_buf.c
-      )
+      zephyr_library_sources(${ZEPHYR_CURRENT_MODULE_DIR}/src/fusain_net_buf.c)
     endif()
   endif()
 else()
@@ -55,11 +56,13 @@ else()
   )
   FetchContent_MakeAvailable(zcbor)
 
+  # Glob all source files recursively (excluding Zephyr-only fusain_net_buf.c)
+  file(GLOB_RECURSE FUSAIN_STANDALONE_SOURCES src/*.c)
+  list(FILTER FUSAIN_STANDALONE_SOURCES EXCLUDE REGEX "fusain_net_buf\\.c$")
+
   # Library target
   add_library(fusain STATIC
-    src/fusain.c
-    src/generated/fusain_cbor_encode.c
-    src/generated/fusain_cbor_decode.c
+    ${FUSAIN_STANDALONE_SOURCES}
     ${zcbor_SOURCE_DIR}/src/zcbor_common.c
     ${zcbor_SOURCE_DIR}/src/zcbor_encode.c
     ${zcbor_SOURCE_DIR}/src/zcbor_decode.c
@@ -69,7 +72,6 @@ else()
   # Include directories with generator expressions for build/install
   target_include_directories(fusain PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/generated>
     $<BUILD_INTERFACE:${zcbor_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
   )
