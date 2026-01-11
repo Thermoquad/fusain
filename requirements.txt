@@ -1,0 +1,9 @@
+# Fusain CBOR Code Generation Dependencies
+# Used by: task zcbor-generate
+#
+# Install: pip install -r requirements.txt
+
+zcbor==0.9.1
+cbor2==5.7.1
+PyYAML==6.0.3
+regex==2025.11.3

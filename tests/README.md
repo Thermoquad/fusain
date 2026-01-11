@@ -32,8 +32,8 @@ Functional tests have fixed test cases and do not use configurable round counts.
   - Various payload size consistency
 
 - **Packet Creation** (16 tests)
-  - v1.x command packets (6 tests)
-  - v2.0 config command packets (7 tests)
+  - Command packets (6 tests)
+  - Config command packets (7 tests)
   - Data packets (3 tests)
 
 - **Message Types Tested**
@@ -71,7 +71,7 @@ Fuzz tests use configurable round counts via `task test-fuzz -- <rounds>`.
   - Corrupted packets
   - State machine recovery
 
-- **v2.0 Packet Fuzzing**
+- **Config Packet Fuzzing**
   - All config command types
   - Random parameter values
 

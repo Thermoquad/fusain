@@ -18,6 +18,13 @@ target_sources(app PRIVATE
   src/test_fuzz.c
 )
 
+# Add net_buf tests when CONFIG_FUSAIN_NET_BUF is enabled
+if(CONFIG_FUSAIN_NET_BUF)
+  target_sources(app PRIVATE
+    src/test_net_buf.c
+  )
+endif()
+
 # Add test include directory
 target_include_directories(app PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src

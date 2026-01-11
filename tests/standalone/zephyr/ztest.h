@@ -126,6 +126,11 @@ static inline void __ztest_set_entry(
 #define zassert_ok(result, fmt, ...) zassert_equal(result, 0, fmt, ##__VA_ARGS__)
 
 /*
+ * Zephyr compatibility - printk
+ */
+#define printk printf
+
+/*
  * Test runner (implemented in main.c)
  */
 int ztest_run_all(void);

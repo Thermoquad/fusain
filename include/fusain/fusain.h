@@ -146,7 +146,7 @@ typedef struct __attribute__((packed)) {
   uint32_t index; // Peripheral index or 0xFFFFFFFF for all
 } fusain_cmd_send_telemetry_t;
 
-/* Configuration Command Payloads (v2.0) */
+/* Configuration Command Payloads */
 typedef struct __attribute__((packed)) {
   int32_t motor;
   uint32_t pwm_period;
@@ -156,14 +156,12 @@ typedef struct __attribute__((packed)) {
   int32_t max_rpm;
   int32_t min_rpm;
   uint32_t min_pwm_duty;
-  uint8_t padding[4];
 } fusain_cmd_motor_config_t;
 
 typedef struct __attribute__((packed)) {
   int32_t pump;
   uint32_t pulse_ms;
   uint32_t recovery_ms;
-  uint8_t padding[4];
 } fusain_cmd_pump_config_t;
 
 typedef struct __attribute__((packed)) {
@@ -171,15 +169,11 @@ typedef struct __attribute__((packed)) {
   double pid_kp;
   double pid_ki;
   double pid_kd;
-  uint32_t sample_count;
-  uint32_t read_rate;
-  uint8_t padding[12];
 } fusain_cmd_temp_config_t;
 
 typedef struct __attribute__((packed)) {
   int32_t glow;
   uint32_t max_duration_ms;
-  uint8_t padding[8];
 } fusain_cmd_glow_config_t;
 
 typedef struct __attribute__((packed)) {
@@ -212,10 +206,10 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   int32_t thermometer; // Thermometer index
   uint32_t timestamp; // Reading timestamp in milliseconds since boot
-  double temp; // Temperature in Celsius
-  uint32_t ctrl_rpm_by_temp; // Temperature-based RPM control active (0 = inactive, 1 = active)
+  double reading; // Temperature in Celsius
+  uint32_t temperature_rpm_control; // Temperature-based RPM control active (0 = inactive, 1 = active)
   int32_t watched_motor; // Motor being controlled (-1 = none)
-  double target_temp; // Target temperature for PID control
+  double target_temperature; // Target temperature for PID control
 } fusain_data_temperature_t;
 
 /* Pump event types */
@@ -250,7 +244,6 @@ typedef struct __attribute__((packed)) {
   uint8_t thermometer_count; // Number of temperature sensors
   uint8_t pump_count; // Number of pumps
   uint8_t glow_count; // Number of glow plugs
-  uint8_t padding[4]; // Reserved for future expansion
 } fusain_data_device_announce_t;
 
 /* Error Message Payloads */
@@ -337,15 +330,15 @@ fusain_decode_result_t fusain_decode_byte(uint8_t rx_byte,
 void fusain_reset_decoder(fusain_decoder_t* decoder);
 
 /**
- * Create a SET_MODE command packet
+ * Create a STATE_COMMAND packet
  *
  * @param packet Output packet
  * @param address Device address
  * @param mode Operating mode
- * @param parameter Mode parameter (RPM for FAN mode)
+ * @param argument Mode-specific argument (RPM for FAN, pump rate for HEAT)
  */
-void fusain_create_set_mode(fusain_packet_t* packet, uint64_t address,
-    fusain_mode_t mode, uint32_t parameter);
+void fusain_create_state_command(fusain_packet_t* packet, uint64_t address,
+    fusain_mode_t mode, int32_t argument);
 
 /**
  * Create a PUMP_COMMAND packet
@@ -435,7 +428,7 @@ void fusain_create_send_telemetry(fusain_packet_t* packet, uint64_t address,
     uint32_t telemetry_type, uint32_t index);
 
 /**
- * Create a MOTOR_CONFIG packet (v2.0)
+ * Create a MOTOR_CONFIG packet
  *
  * @param packet Output packet
  * @param config Motor configuration parameters
@@ -444,7 +437,7 @@ void fusain_create_motor_config(fusain_packet_t* packet, uint64_t address,
     const fusain_cmd_motor_config_t* config);
 
 /**
- * Create a PUMP_CONFIG packet (v2.0)
+ * Create a PUMP_CONFIG packet
  *
  * @param packet Output packet
  * @param config Pump configuration parameters
@@ -453,7 +446,7 @@ void fusain_create_pump_config(fusain_packet_t* packet, uint64_t address,
     const fusain_cmd_pump_config_t* config);
 
 /**
- * Create a TEMP_CONFIG packet (v2.0)
+ * Create a TEMP_CONFIG packet
  *
  * @param packet Output packet
  * @param config Temperature configuration parameters
@@ -462,7 +455,7 @@ void fusain_create_temp_config(fusain_packet_t* packet, uint64_t address,
     const fusain_cmd_temp_config_t* config);
 
 /**
- * Create a GLOW_CONFIG packet (v2.0)
+ * Create a GLOW_CONFIG packet
  *
  * @param packet Output packet
  * @param config Glow plug configuration parameters
@@ -481,7 +474,7 @@ void fusain_create_data_subscription(fusain_packet_t* packet, uint64_t address,
     uint64_t appliance_address);
 
 /**
- * Create a DATA_UNSUBSCRIBE packet (v2.0)
+ * Create a DATA_UNSUBSCRIBE packet
  *
  * @param packet Output packet
  * @param appliance_address Address of appliance to unsubscribe from
@@ -490,7 +483,7 @@ void fusain_create_data_unsubscribe(fusain_packet_t* packet, uint64_t address,
     uint64_t appliance_address);
 
 /**
- * Create a DISCOVERY_REQUEST packet (v2.0)
+ * Create a DISCOVERY_REQUEST packet
  *
  * @param packet Output packet
  */
@@ -533,6 +526,76 @@ void fusain_create_device_announce(fusain_packet_t* packet, uint64_t address,
     uint8_t glow_count);
 
 /**
+ * Create a MOTOR_DATA packet
+ *
+ * @param packet Output packet
+ * @param address Device address
+ * @param motor Motor index
+ * @param timestamp Timestamp in milliseconds since boot
+ * @param rpm Current measured RPM
+ * @param target Target RPM setpoint
+ */
+void fusain_create_motor_data(fusain_packet_t* packet, uint64_t address,
+    int32_t motor, uint32_t timestamp, int32_t rpm, int32_t target);
+
+/**
+ * Create a PUMP_DATA packet
+ *
+ * @param packet Output packet
+ * @param address Device address
+ * @param pump Pump index
+ * @param timestamp Timestamp in milliseconds since boot
+ * @param type Event type (fusain_pump_event_t)
+ * @param rate Current pump rate in milliseconds
+ */
+void fusain_create_pump_data(fusain_packet_t* packet, uint64_t address,
+    int32_t pump, uint32_t timestamp, fusain_pump_event_t type, int32_t rate);
+
+/**
+ * Create a GLOW_DATA packet
+ *
+ * @param packet Output packet
+ * @param address Device address
+ * @param glow Glow plug index
+ * @param timestamp Timestamp in milliseconds since boot
+ * @param lit Lit status (true = on, false = off)
+ */
+void fusain_create_glow_data(fusain_packet_t* packet, uint64_t address,
+    int32_t glow, uint32_t timestamp, bool lit);
+
+/**
+ * Create a TEMP_DATA packet
+ *
+ * @param packet Output packet
+ * @param address Device address
+ * @param thermometer Thermometer index
+ * @param timestamp Timestamp in milliseconds since boot
+ * @param reading Temperature reading in Celsius
+ */
+void fusain_create_temp_data(fusain_packet_t* packet, uint64_t address,
+    int32_t thermometer, uint32_t timestamp, double reading);
+
+/**
+ * Create an ERROR_INVALID_CMD packet
+ *
+ * @param packet Output packet
+ * @param address Device address
+ * @param error_code Error code (1 = invalid param, 2 = invalid device index)
+ */
+void fusain_create_error_invalid_cmd(fusain_packet_t* packet, uint64_t address,
+    int32_t error_code);
+
+/**
+ * Create an ERROR_STATE_REJECT packet
+ *
+ * @param packet Output packet
+ * @param address Device address
+ * @param state Current state that rejected the command
+ */
+void fusain_create_error_state_reject(fusain_packet_t* packet, uint64_t address,
+    fusain_state_t state);
+
+/**
  * Fusain state command message (for Zbus/IPC)
  *
  * This structure is used for inter-process communication (e.g., Zbus)
@@ -544,5 +607,44 @@ typedef struct {
   fusain_mode_t mode; // Target mode (IDLE, FAN, HEAT, EMERGENCY)
   uint32_t parameter; // Mode parameter (RPM for FAN, pump rate for HEAT)
 } fusain_state_command_msg_t;
+
+/* Net Buffer API (Zephyr only) */
+#ifdef CONFIG_FUSAIN_NET_BUF
+
+/* Forward declarations - include <zephyr/net_buf.h> before using these APIs */
+struct net_buf;
+struct net_buf_pool;
+
+/**
+ * Decode a byte and return net_buf on packet completion
+ *
+ * Wrapper around fusain_decode_byte() that allocates a net_buf
+ * when a complete packet is decoded.
+ *
+ * Note: Include <zephyr/net_buf.h> before calling this function.
+ *
+ * @param byte Received byte to process
+ * @param pool Net buffer pool to allocate from
+ * @param decoder Decoder state (must be initialized and persistent)
+ * @return Pointer to net_buf containing decoded packet on completion,
+ *         or NULL if packet incomplete. Caller must unref when done.
+ */
+struct net_buf* fusain_decode_byte_to_net_buf(uint8_t byte,
+    struct net_buf_pool* pool,
+    fusain_decoder_t* decoder);
+
+/**
+ * Get fusain_packet_t pointer from net_buf
+ *
+ * Returns a pointer to the fusain_packet_t stored in the net_buf data.
+ *
+ * Note: Include <zephyr/net_buf.h> before calling this function.
+ *
+ * @param buf Net buffer containing decoded packet
+ * @return Pointer to packet structure (valid while buf is referenced)
+ */
+fusain_packet_t* fusain_packet_from_buf(struct net_buf* buf);
+
+#endif /* CONFIG_FUSAIN_NET_BUF */
 
 #endif /* FUSAIN_H_ */

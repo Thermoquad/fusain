@@ -3,20 +3,21 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * Fusain Protocol Library - Packet Decoding Tests
+ *
+ * Wire format: [START][LENGTH][ADDRESS(8)][CBOR_PAYLOAD][CRC(2)][END]
+ * CBOR payload contains [msg_type, payload_map]
  */
 
 #include <fusain/fusain.h>
 #include <string.h>
 #include <zephyr/ztest.h>
 
-/* Test basic round-trip encoding/decoding */
+/* Test basic round-trip encoding/decoding using helper functions */
 ZTEST(fusain_decoding, test_roundtrip_basic)
 {
-  fusain_packet_t tx_packet = {
-    .length = 5,
-    .msg_type = FUSAIN_MSG_STATE_DATA,
-  };
-  memcpy(tx_packet.payload, "HELLO", 5);
+  /* Use a helper function to create a valid CBOR packet */
+  fusain_packet_t tx_packet;
+  fusain_create_motor_command(&tx_packet, 0x1234, 0, 3000);
 
   /* Encode */
   uint8_t buffer[FUSAIN_MAX_PACKET_SIZE * 2];
@@ -40,17 +41,17 @@ ZTEST(fusain_decoding, test_roundtrip_basic)
   zassert_equal(result, FUSAIN_DECODE_OK, "Decoding should succeed");
   zassert_equal(rx_packet.length, tx_packet.length, "Length should match");
   zassert_equal(rx_packet.msg_type, tx_packet.msg_type, "Type should match");
+  zassert_equal(rx_packet.address, tx_packet.address, "Address should match");
   zassert_mem_equal(rx_packet.payload, tx_packet.payload, tx_packet.length,
       "Payload should match");
 }
 
-/* Test decoding with empty payload */
+/* Test decoding with nil payload (PING_REQUEST, DISCOVERY_REQUEST) */
 ZTEST(fusain_decoding, test_roundtrip_empty_payload)
 {
-  fusain_packet_t tx_packet = {
-    .length = 0,
-    .msg_type = FUSAIN_MSG_PING_REQUEST,
-  };
+  /* In CBOR mode, PING_REQUEST has [type, nil] */
+  fusain_packet_t tx_packet;
+  fusain_create_ping_request(&tx_packet, 0x5678);
 
   uint8_t buffer[FUSAIN_MAX_PACKET_SIZE * 2];
   int encoded_len = fusain_encode_packet(&tx_packet, buffer, sizeof(buffer));
@@ -66,20 +67,17 @@ ZTEST(fusain_decoding, test_roundtrip_empty_payload)
     result = fusain_decode_byte(buffer[i], &rx_packet, &decoder);
   }
 
-  zassert_equal(result, FUSAIN_DECODE_OK, "Should decode empty payload");
-  zassert_equal(rx_packet.length, 0, "Length should be 0");
+  zassert_equal(result, FUSAIN_DECODE_OK, "Should decode nil payload");
+  zassert_equal(rx_packet.msg_type, FUSAIN_MSG_PING_REQUEST, "Type should match");
 }
 
 /* Test decoding with byte stuffing */
 ZTEST(fusain_decoding, test_roundtrip_byte_stuffing)
 {
-  fusain_packet_t tx_packet = {
-    .length = 3,
-    .msg_type = FUSAIN_MSG_STATE_COMMAND,
-  };
-  tx_packet.payload[0] = FUSAIN_START_BYTE;
-  tx_packet.payload[1] = FUSAIN_END_BYTE;
-  tx_packet.payload[2] = FUSAIN_ESC_BYTE;
+  /* Create a packet where address or data contains escapable bytes */
+  fusain_packet_t tx_packet;
+  fusain_create_device_announce(&tx_packet, 0x7E7D7F01, 1, 1, 1, 1);
+  /* Address contains START_BYTE, ESC_BYTE, END_BYTE which need escaping */
 
   uint8_t buffer[FUSAIN_MAX_PACKET_SIZE * 2];
   int encoded_len = fusain_encode_packet(&tx_packet, buffer, sizeof(buffer));
@@ -95,19 +93,14 @@ ZTEST(fusain_decoding, test_roundtrip_byte_stuffing)
   }
 
   zassert_equal(result, FUSAIN_DECODE_OK, "Should decode stuffed bytes");
-  zassert_equal(rx_packet.payload[0], FUSAIN_START_BYTE, "START should unstuff");
-  zassert_equal(rx_packet.payload[1], FUSAIN_END_BYTE, "END should unstuff");
-  zassert_equal(rx_packet.payload[2], FUSAIN_ESC_BYTE, "ESC should unstuff");
+  zassert_equal(rx_packet.address, tx_packet.address, "Address should match after unstuffing");
 }
 
 /* Test decoding with CRC error */
 ZTEST(fusain_decoding, test_decode_crc_error)
 {
-  fusain_packet_t tx_packet = {
-    .length = 4,
-    .msg_type = FUSAIN_MSG_MOTOR_COMMAND,
-  };
-  memcpy(tx_packet.payload, "TEST", 4);
+  fusain_packet_t tx_packet;
+  fusain_create_motor_command(&tx_packet, 0x1234, 0, 2000);
 
   uint8_t buffer[FUSAIN_MAX_PACKET_SIZE * 2];
   int encoded_len = fusain_encode_packet(&tx_packet, buffer, sizeof(buffer));
@@ -149,18 +142,26 @@ ZTEST(fusain_decoding, test_decoder_reset)
   zassert_false(decoder.escape_next, "Escape flag should be reset");
 }
 
-/* Test decoding with maximum payload */
+/* Test decoding with large CBOR payload (motor_config has many fields) */
 ZTEST(fusain_decoding, test_roundtrip_max_payload)
 {
-  fusain_packet_t tx_packet = {
-    .length = FUSAIN_MAX_PAYLOAD_SIZE,
-    .msg_type = FUSAIN_MSG_STATE_DATA,
+  /* Create a motor_config packet which has many CBOR fields
+   * This tests the decoder's ability to handle larger payloads */
+  fusain_cmd_motor_config_t config = {
+    .motor = 0,
+    .pwm_period = 1000000, /* Large value to increase CBOR size */
+    .pid_kp = 4.0,
+    .pid_ki = 12.0,
+    .pid_kd = 0.1,
+    .max_rpm = 3400,
+    .min_rpm = 800,
+    .min_pwm_duty = 500000, /* Large value to increase CBOR size */
   };
 
-  /* Fill with pattern */
-  for (int i = 0; i < tx_packet.length; i++) {
-    tx_packet.payload[i] = i & 0xFF;
-  }
+  fusain_packet_t tx_packet;
+  fusain_create_motor_config(&tx_packet, 0xABCDEF0123456789, &config);
+
+  zassert_true(tx_packet.length > 0, "CBOR payload should not be empty");
 
   uint8_t buffer[FUSAIN_MAX_PACKET_SIZE * 2];
   int encoded_len = fusain_encode_packet(&tx_packet, buffer, sizeof(buffer));
@@ -175,27 +176,37 @@ ZTEST(fusain_decoding, test_roundtrip_max_payload)
     result = fusain_decode_byte(buffer[i], &rx_packet, &decoder);
   }
 
-  zassert_equal(result, FUSAIN_DECODE_OK, "Should decode max payload");
-  zassert_equal(rx_packet.length, FUSAIN_MAX_PAYLOAD_SIZE, "Length should match");
+  zassert_equal(result, FUSAIN_DECODE_OK, "Should decode large CBOR payload");
+  zassert_equal(rx_packet.length, tx_packet.length, "Length should match");
+  zassert_equal(rx_packet.msg_type, tx_packet.msg_type, "Type should match");
   zassert_mem_equal(rx_packet.payload, tx_packet.payload, tx_packet.length,
       "Payload should match");
 }
 
-/* Test round-trip consistency with various payload sizes */
+/* Test round-trip consistency with various message types */
 ZTEST(fusain_decoding, test_roundtrip_consistency)
 {
-  /* Test several specific payload sizes: 1, 8, 32, 57, 114 (max) */
-  uint8_t test_sizes[] = { 1, 8, 32, 57, FUSAIN_MAX_PAYLOAD_SIZE };
+  fusain_packet_t tx_packet;
+  const char* test_names[] = { "ping_request", "set_mode", "state_data",
+    "motor_command", "device_announce" };
 
-  for (int i = 0; i < sizeof(test_sizes); i++) {
-    fusain_packet_t tx_packet = {
-      .length = test_sizes[i],
-      .msg_type = FUSAIN_MSG_STATE_DATA,
-    };
-
-    /* Fill with pattern */
-    for (int j = 0; j < tx_packet.length; j++) {
-      tx_packet.payload[j] = (i + j) & 0xFF;
+  for (int i = 0; i < 5; i++) {
+    switch (i) {
+    case 0:
+      fusain_create_ping_request(&tx_packet, 0x1111);
+      break;
+    case 1:
+      fusain_create_state_command(&tx_packet, 0x2222, FUSAIN_MODE_HEAT, 2500);
+      break;
+    case 2:
+      fusain_create_state_data(&tx_packet, 0x3333, 0, 0, FUSAIN_STATE_HEATING, 12345);
+      break;
+    case 3:
+      fusain_create_motor_command(&tx_packet, 0x4444, 0, 3000);
+      break;
+    case 4:
+      fusain_create_device_announce(&tx_packet, 0x5555, 1, 1, 1, 1);
+      break;
     }
 
     uint8_t buffer[FUSAIN_MAX_PACKET_SIZE * 2];
@@ -212,17 +223,17 @@ ZTEST(fusain_decoding, test_roundtrip_consistency)
     }
 
     zassert_equal(result, FUSAIN_DECODE_OK,
-        "Size %d: Decoding should succeed", test_sizes[i]);
+        "%s: Decoding should succeed", test_names[i]);
     zassert_equal(rx_packet.length, tx_packet.length,
-        "Size %d: Length should match", test_sizes[i]);
+        "%s: Length should match", test_names[i]);
     zassert_equal(rx_packet.msg_type, tx_packet.msg_type,
-        "Size %d: Type should match", test_sizes[i]);
+        "%s: Type should match", test_names[i]);
     zassert_mem_equal(rx_packet.payload, tx_packet.payload, tx_packet.length,
-        "Size %d: Payload should match", test_sizes[i]);
+        "%s: Payload should match", test_names[i]);
   }
 }
 
-/* Test decoder in IDLE state receiving non-START bytes (lines 168-170) */
+/* Test decoder in IDLE state receiving non-START bytes */
 ZTEST(fusain_decoding, test_decode_idle_garbage)
 {
   fusain_decoder_t decoder;
@@ -250,7 +261,7 @@ ZTEST(fusain_decoding, test_decode_idle_garbage)
       "Should accept START after garbage");
 }
 
-/* Test decoder receiving invalid length > 114 (lines 174-175) */
+/* Test decoder receiving invalid length > 114 */
 ZTEST(fusain_decoding, test_decode_invalid_length)
 {
   fusain_decoder_t decoder;
@@ -274,14 +285,11 @@ ZTEST(fusain_decoding, test_decode_invalid_length)
       "Should be in IDLE after invalid length");
 }
 
-/* Test decoder expecting END but receiving wrong byte (lines 226-227) */
+/* Test decoder expecting END but receiving wrong byte */
 ZTEST(fusain_decoding, test_decode_missing_end_byte)
 {
-  fusain_packet_t tx_packet = {
-    .length = 0,
-    .address = 0x0102030405060708,
-    .msg_type = FUSAIN_MSG_PING_REQUEST,
-  };
+  fusain_packet_t tx_packet;
+  fusain_create_ping_request(&tx_packet, 0x0102030405060708);
 
   uint8_t buffer[FUSAIN_MAX_PACKET_SIZE * 2];
   int encoded_len = fusain_encode_packet(&tx_packet, buffer, sizeof(buffer));
@@ -307,7 +315,7 @@ ZTEST(fusain_decoding, test_decode_missing_end_byte)
       "Should fail when END byte is missing");
 }
 
-/* Test decoder with corrupted state (defensive code, lines 241-243) */
+/* Test decoder with corrupted state (defensive code) */
 ZTEST(fusain_decoding, test_decode_invalid_state)
 {
   fusain_decoder_t decoder;
@@ -326,6 +334,244 @@ ZTEST(fusain_decoding, test_decode_invalid_state)
 
   /* Decoder should be reset to IDLE */
   zassert_equal(decoder.state, 0, "Should reset to IDLE after invalid state");
+}
+
+/* Test CBOR header decoding edge cases */
+ZTEST(fusain_decoding, test_decode_cbor_header_errors)
+{
+  fusain_decoder_t decoder;
+  fusain_reset_decoder(&decoder);
+
+  fusain_packet_t rx_packet;
+  fusain_decode_result_t result;
+
+  /* Build a packet with invalid CBOR header (not 0x82 array)
+   * We need a valid CRC so the CBOR decode path is actually tested */
+  uint8_t crc_data[] = {
+    3, /* length */
+    0x01,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00, /* address (LE) */
+    0x83,
+    0x30,
+    0xF6, /* Invalid: 3-element array instead of 2 */
+  };
+  uint16_t crc = fusain_crc16(crc_data, sizeof(crc_data));
+
+  uint8_t invalid_cbor[] = {
+    FUSAIN_START_BYTE,
+    3, /* length = 3 bytes of CBOR */
+    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* address */
+    0x83, 0x30, 0xF6, /* Invalid: 3-element array instead of 2 */
+    (uint8_t)(crc >> 8), (uint8_t)(crc & 0xFF), /* Valid CRC */
+    FUSAIN_END_BYTE
+  };
+
+  for (size_t i = 0; i < sizeof(invalid_cbor); i++) {
+    result = fusain_decode_byte(invalid_cbor[i], &rx_packet, &decoder);
+    if (result != FUSAIN_DECODE_INCOMPLETE) {
+      break;
+    }
+  }
+
+  /* Should fail due to invalid CBOR header (0x83 != 0x82) */
+  zassert_equal(result, FUSAIN_DECODE_INVALID_START,
+      "Should reject packet with invalid CBOR header");
+}
+
+/* Test decoding with truncated CBOR payload (buffer_size < 2) */
+ZTEST(fusain_decoding, test_decode_truncated_cbor)
+{
+  fusain_decoder_t decoder;
+  fusain_reset_decoder(&decoder);
+
+  fusain_packet_t rx_packet;
+  fusain_decode_result_t result;
+
+  /* Build a packet with truncated CBOR (only 1 byte, need at least 2)
+   * This triggers line 112: if (buffer_size < 2) return -1 */
+  uint8_t crc_data[] = {
+    1, /* length */
+    0x01,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00, /* address (LE) */
+    0x82, /* Just the array header, no type */
+  };
+  uint16_t crc = fusain_crc16(crc_data, sizeof(crc_data));
+
+  uint8_t truncated[] = {
+    FUSAIN_START_BYTE,
+    1, /* length = 1 byte (too short for valid CBOR array) */
+    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* address */
+    0x82, /* Just the array header, no type or payload */
+    (uint8_t)(crc >> 8), (uint8_t)(crc & 0xFF), /* Valid CRC */
+    FUSAIN_END_BYTE
+  };
+
+  for (size_t i = 0; i < sizeof(truncated); i++) {
+    result = fusain_decode_byte(truncated[i], &rx_packet, &decoder);
+    if (result != FUSAIN_DECODE_INCOMPLETE) {
+      break;
+    }
+  }
+
+  /* Should fail due to truncated CBOR (buffer_size < 2) */
+  zassert_equal(result, FUSAIN_DECODE_INVALID_START,
+      "Should reject packet with truncated CBOR");
+}
+
+/* Test decoding with unsupported CBOR type encoding (line 133) */
+ZTEST(fusain_decoding, test_decode_unsupported_cbor_type)
+{
+  fusain_decoder_t decoder;
+  fusain_reset_decoder(&decoder);
+
+  fusain_packet_t rx_packet;
+  fusain_decode_result_t result;
+
+  /* Build a packet with unsupported type encoding (0x19 = uint16 follows)
+   * This triggers line 133: return -1 for unsupported encoding */
+  uint8_t crc_data[] = {
+    5, /* length */
+    0x01,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00, /* address (LE) */
+    0x82,
+    0x19,
+    0x00,
+    0x30,
+    0xF6, /* Array with uint16 type - unsupported */
+  };
+  uint16_t crc = fusain_crc16(crc_data, sizeof(crc_data));
+
+  uint8_t unsupported[] = {
+    FUSAIN_START_BYTE,
+    5, /* length */
+    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* address */
+    0x82, 0x19, 0x00, 0x30, 0xF6, /* Array with uint16 type - unsupported */
+    (uint8_t)(crc >> 8), (uint8_t)(crc & 0xFF), /* Valid CRC */
+    FUSAIN_END_BYTE
+  };
+
+  for (size_t i = 0; i < sizeof(unsupported); i++) {
+    result = fusain_decode_byte(unsupported[i], &rx_packet, &decoder);
+    if (result != FUSAIN_DECODE_INCOMPLETE) {
+      break;
+    }
+  }
+
+  /* Should fail due to unsupported CBOR encoding */
+  zassert_equal(result, FUSAIN_DECODE_INVALID_START,
+      "Should reject packet with unsupported CBOR type encoding");
+}
+
+/* Test decoding with zero-length CBOR payload (line 285)
+ * This happens when packet->length == 0 after address bytes */
+ZTEST(fusain_decoding, test_decode_zero_length_payload)
+{
+  fusain_decoder_t decoder;
+  fusain_reset_decoder(&decoder);
+
+  fusain_packet_t rx_packet;
+  fusain_decode_result_t result;
+
+  /* Build a packet with zero-length CBOR payload
+   * This should trigger line 285: if (packet->length == 0) state = CRC1 */
+  uint8_t crc_data[] = {
+    0, /* length = 0 */
+    0x01,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00, /* address (LE) */
+    /* No CBOR payload */
+  };
+  uint16_t crc = fusain_crc16(crc_data, sizeof(crc_data));
+
+  uint8_t zero_len_packet[] = {
+    FUSAIN_START_BYTE,
+    0, /* length = 0 */
+    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* address */
+    /* No CBOR payload bytes */
+    (uint8_t)(crc >> 8), (uint8_t)(crc & 0xFF), /* Valid CRC */
+    FUSAIN_END_BYTE
+  };
+
+  for (size_t i = 0; i < sizeof(zero_len_packet); i++) {
+    result = fusain_decode_byte(zero_len_packet[i], &rx_packet, &decoder);
+    if (result != FUSAIN_DECODE_INCOMPLETE) {
+      break;
+    }
+  }
+
+  /* Should fail because zero-length CBOR is invalid (can't extract msg_type) */
+  zassert_equal(result, FUSAIN_DECODE_INVALID_START,
+      "Should reject packet with zero-length CBOR payload");
+}
+
+/* Test decoding with uint8 type prefix but truncated (line 127) */
+ZTEST(fusain_decoding, test_decode_truncated_uint8_type)
+{
+  fusain_decoder_t decoder;
+  fusain_reset_decoder(&decoder);
+
+  fusain_packet_t rx_packet;
+  fusain_decode_result_t result;
+
+  /* Build a packet with uint8 type prefix (0x18) but no value follows
+   * This triggers line 127: if (buffer_size < 3) return -1 */
+  uint8_t crc_data[] = {
+    2, /* length = 2 bytes (array header + 0x18, but no value) */
+    0x01,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00, /* address (LE) */
+    0x82,
+    0x18, /* Array header + uint8 prefix, missing value */
+  };
+  uint16_t crc = fusain_crc16(crc_data, sizeof(crc_data));
+
+  uint8_t truncated[] = {
+    FUSAIN_START_BYTE,
+    2, /* length */
+    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* address */
+    0x82, 0x18, /* Array header + uint8 prefix, missing value */
+    (uint8_t)(crc >> 8), (uint8_t)(crc & 0xFF), /* Valid CRC */
+    FUSAIN_END_BYTE
+  };
+
+  for (size_t i = 0; i < sizeof(truncated); i++) {
+    result = fusain_decode_byte(truncated[i], &rx_packet, &decoder);
+    if (result != FUSAIN_DECODE_INCOMPLETE) {
+      break;
+    }
+  }
+
+  /* Should fail due to truncated uint8 type encoding */
+  zassert_equal(result, FUSAIN_DECODE_INVALID_START,
+      "Should reject packet with truncated uint8 type prefix");
 }
 
 /* Test suite setup */

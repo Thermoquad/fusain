@@ -3,14 +3,18 @@
 
 menuconfig FUSAIN
 	bool "Fusain Serial Protocol Library"
+	select ZCBOR
+	select CRC
 	help
 	  Enable the Fusain serial protocol encoder/decoder library.
-	  This library provides CRC-16-CCITT calculation, packet encoding
-	  with byte stuffing, and stateful packet decoding for the Fusain
-	  serial communication protocol.
+	  This library provides CBOR-encoded packet payloads, CRC-16-CCITT
+	  error detection, byte stuffing, and stateful packet decoding for
+	  the Fusain serial communication protocol.
 
-	  Note: This is a pure C library with no Zephyr dependencies.
-	  It does NOT require CONFIG_CRC (implements own CRC-16-CCITT).
+	  In Zephyr mode, this library uses:
+	  - zcbor for CBOR encoding/decoding (auto-selected)
+	  - Zephyr's native crc16_itu_t() for CRC calculation
+
 	  It does NOT require CONFIG_SERIAL (protocol layer only, no UART).
 
 if FUSAIN
@@ -22,5 +26,15 @@ config FUSAIN_LOG_LEVEL
 	help
 	  Set the log level for the Fusain serial protocol library.
 	  0 = OFF, 1 = ERROR, 2 = WARNING, 3 = INFO, 4 = DEBUG
+
+config FUSAIN_NET_BUF
+	bool "Net buffer decoder API"
+	default y
+	select NET_BUF
+	help
+	  Enable fusain_decode_byte_to_net_buf() for convenient packet
+	  decoding with net_buf output. Packets are allocated from a
+	  net_buf pool for easy forwarding to Bluetooth, TCP, or other
+	  Zephyr subsystems.
 
 endif # FUSAIN

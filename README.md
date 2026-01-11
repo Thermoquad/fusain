@@ -6,20 +6,23 @@ Reusable C library for encoding and decoding Fusain serial protocol packets.
 
 ## Features
 
+- **CBOR payload encoding** (RFC 8949) using zcbor-generated code
 - **CRC-16-CCITT** error detection (polynomial 0x1021, initial 0xFFFF)
 - **Byte stuffing** for packet framing
 - **Stateful decoder** for streaming byte-by-byte decoding
 - **64-bit addressing** for multi-device networks
-- **Pure C implementation** - zero dependencies beyond standard C library
+- **Pure C implementation** - zcbor runtime (auto-fetched in standalone mode)
 - **Portable** - works on embedded systems and host applications
 
 ## Protocol Overview
 
 - **Framing:** START (0x7E) ... END (0x7F) with escape byte (0x7D) for byte stuffing
-- **Structure:** START + LENGTH + ADDRESS(8) + MSG_TYPE + PAYLOAD + CRC(2) + END
-- **Max packet size:** 128 bytes (14 overhead + 114 payload)
-- **Max payload size:** 114 bytes
+- **Structure:** START + LENGTH + ADDRESS(8) + CBOR_PAYLOAD + CRC(2) + END
+- **CBOR payload:** `[msg_type, payload_map]` or `[msg_type, nil]` for empty payloads
+- **Max packet size:** 128 bytes (13 overhead + CBOR payload)
+- **Max CBOR payload size:** 114 bytes
 - **Message types:** Configuration, Control, Telemetry, Errors
+- **Encoding:** CBOR (RFC 8949) using zcbor-generated code
 
 ## Build Modes
 
@@ -156,7 +159,7 @@ void fusain_reset_decoder(fusain_decoder_t* decoder);
 The library provides helper functions for creating common message types:
 
 **Control Commands:**
-- `fusain_create_set_mode()` - Set operating mode command
+- `fusain_create_state_command()` - Set operating mode command
 - `fusain_create_pump_command()` - Set fuel pump rate command
 - `fusain_create_motor_command()` - Set target RPM command
 - `fusain_create_glow_command()` - Glow plug control command
@@ -231,10 +234,14 @@ The decoder (`fusain_decode_byte()`) requires per-connection state and is NOT th
 
 ### Platform Independence
 
-The library uses only standard C types and functions:
+The library uses standard C types and functions:
 - `<stdbool.h>`, `<stddef.h>`, `<stdint.h>`, `<string.h>`
 - No dynamic allocation
 - No platform-specific code
+
+**Dependencies:**
+- **Standalone mode:** zcbor runtime (auto-fetched via CMake FetchContent)
+- **Zephyr mode:** Uses Zephyr's built-in zcbor (`CONFIG_ZCBOR`)
 
 Can be compiled for:
 - Embedded systems (ARM, RISC-V, etc.)

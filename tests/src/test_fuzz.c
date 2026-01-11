@@ -11,7 +11,22 @@
 #include <zephyr/ztest.h>
 
 /* Simple LCG random number generator for reproducibility */
-static uint32_t fuzz_seed = 0x12345678;
+static uint32_t fuzz_seed;
+static uint32_t initial_seed;
+
+__attribute__((unused)) static void* fuzz_suite_setup(void)
+{
+  /* Use Kconfig seed if set (non-zero), otherwise random */
+  if (CONFIG_FUSAIN_TEST_FUZZ_SEED != 0) {
+    fuzz_seed = CONFIG_FUSAIN_TEST_FUZZ_SEED;
+  } else {
+    fuzz_seed = sys_rand32_get();
+  }
+  initial_seed = fuzz_seed;
+  printk("Fuzz seed: 0x%08X (set CONFIG_FUSAIN_TEST_FUZZ_SEED to reproduce)\n",
+      initial_seed);
+  return NULL;
+}
 
 static uint32_t fuzz_rand(void)
 {
@@ -22,6 +37,96 @@ static uint32_t fuzz_rand(void)
 static uint8_t fuzz_rand_byte(void)
 {
   return fuzz_rand() & 0xFF;
+}
+
+/* Create a random valid packet using the create_* helpers */
+static void fuzz_create_random_packet(fusain_packet_t* packet)
+{
+  uint64_t addr = ((uint64_t)fuzz_rand() << 32) | fuzz_rand();
+
+  switch (fuzz_rand() % 16) {
+  case 0: {
+    fusain_cmd_motor_config_t cfg = {
+      .motor = fuzz_rand_byte(),
+      .pwm_period = fuzz_rand(),
+      .pid_kp = (double)fuzz_rand() / 1000.0,
+      .pid_ki = (double)fuzz_rand() / 1000.0,
+      .pid_kd = (double)fuzz_rand() / 1000.0,
+      .max_rpm = fuzz_rand(),
+      .min_rpm = fuzz_rand(),
+      .min_pwm_duty = fuzz_rand(),
+    };
+    fusain_create_motor_config(packet, addr, &cfg);
+    break;
+  }
+  case 1: {
+    fusain_cmd_pump_config_t cfg = {
+      .pump = fuzz_rand_byte(),
+      .pulse_ms = fuzz_rand(),
+      .recovery_ms = fuzz_rand(),
+    };
+    fusain_create_pump_config(packet, addr, &cfg);
+    break;
+  }
+  case 2: {
+    fusain_cmd_temp_config_t cfg = {
+      .thermometer = fuzz_rand_byte(),
+      .pid_kp = (double)fuzz_rand() / 1000.0,
+      .pid_ki = (double)fuzz_rand() / 1000.0,
+      .pid_kd = (double)fuzz_rand() / 1000.0,
+    };
+    fusain_create_temp_config(packet, addr, &cfg);
+    break;
+  }
+  case 3: {
+    fusain_cmd_glow_config_t cfg = {
+      .glow = fuzz_rand_byte(),
+      .max_duration_ms = fuzz_rand(),
+    };
+    fusain_create_glow_config(packet, addr, &cfg);
+    break;
+  }
+  case 4:
+    fusain_create_state_command(packet, addr, fuzz_rand_byte(), (int32_t)fuzz_rand());
+    break;
+  case 5:
+    fusain_create_pump_command(packet, addr, fuzz_rand_byte(), fuzz_rand());
+    break;
+  case 6:
+    fusain_create_motor_command(packet, addr, fuzz_rand_byte(), fuzz_rand());
+    break;
+  case 7:
+    fusain_create_ping_request(packet, addr);
+    break;
+  case 8:
+    fusain_create_ping_response(packet, addr, fuzz_rand());
+    break;
+  case 9:
+    fusain_create_discovery_request(packet, addr);
+    break;
+  case 10:
+    fusain_create_device_announce(packet, addr, fuzz_rand_byte(),
+        fuzz_rand_byte(), fuzz_rand_byte(), fuzz_rand_byte());
+    break;
+  case 11:
+    /* state and error_code are constrained to .le 255 in CDDL */
+    fusain_create_state_data(packet, addr, fuzz_rand() % 2,
+        fuzz_rand_byte(), fuzz_rand_byte(), fuzz_rand());
+    break;
+  case 12:
+    fusain_create_data_subscription(packet, addr, ((uint64_t)fuzz_rand() << 32) | fuzz_rand());
+    break;
+  case 13:
+    fusain_create_data_unsubscribe(packet, addr, ((uint64_t)fuzz_rand() << 32) | fuzz_rand());
+    break;
+  case 14:
+    fusain_create_timeout_config(packet, addr, fuzz_rand() % 2, fuzz_rand());
+    break;
+  case 15:
+    /* Emergency stop via state_command with EMERGENCY mode */
+    fusain_create_state_command(packet, addr, FUSAIN_MODE_EMERGENCY, 0);
+    break;
+  }
 }
 
 /* Fuzz encoding with random payloads */
@@ -86,13 +191,13 @@ ZTEST(fusain_fuzz, test_fuzz_decoding_random)
     uint8_t random_data[100];
 
     /* Generate random byte stream */
-    for (int i = 0; i < sizeof(random_data); i++) {
+    for (size_t i = 0; i < sizeof(random_data); i++) {
       random_data[i] = fuzz_rand_byte();
     }
 
     /* Feed to decoder */
     fusain_decode_result_t result = FUSAIN_DECODE_INCOMPLETE;
-    for (int i = 0; i < sizeof(random_data); i++) {
+    for (size_t i = 0; i < sizeof(random_data); i++) {
       result = fusain_decode_byte(random_data[i], &packet, &decoder);
 
       /* Decoder should never crash, only return valid states */
@@ -110,32 +215,20 @@ ZTEST(fusain_fuzz, test_fuzz_decoding_random)
   printk("Fuzz decoding: Detected %d errors in random data\n", detected_errors);
 }
 
-/* Fuzz round-trip with valid packets but random data */
+/* Fuzz round-trip with valid CBOR packets */
 ZTEST(fusain_fuzz, test_fuzz_roundtrip)
 {
   int success_count = 0;
 
   for (int round = 0; round < CONFIG_FUSAIN_TEST_FUZZ_ROUNDS; round++) {
     fusain_packet_t tx_packet;
-
-    /* Random valid length */
-    tx_packet.length = fuzz_rand() % (FUSAIN_MAX_PAYLOAD_SIZE + 1);
-
-    /* Random message type */
-    tx_packet.msg_type = fuzz_rand_byte();
-
-    /* Random payload */
-    for (int i = 0; i < tx_packet.length; i++) {
-      tx_packet.payload[i] = fuzz_rand_byte();
-    }
+    fuzz_create_random_packet(&tx_packet);
 
     /* Encode */
     uint8_t buffer[FUSAIN_MAX_PACKET_SIZE * 2];
     int encoded_len = fusain_encode_packet(&tx_packet, buffer, sizeof(buffer));
 
-    if (encoded_len < 0) {
-      continue; /* Skip invalid packets */
-    }
+    zassert_true(encoded_len > 0, "Round %d: Encoding should succeed", round);
 
     /* Decode */
     fusain_decoder_t decoder;
@@ -157,6 +250,8 @@ ZTEST(fusain_fuzz, test_fuzz_roundtrip)
         "Round %d: Length should match", round);
     zassert_equal(rx_packet.msg_type, tx_packet.msg_type,
         "Round %d: Type should match", round);
+    zassert_equal(rx_packet.address, tx_packet.address,
+        "Round %d: Address should match", round);
     zassert_mem_equal(rx_packet.payload, tx_packet.payload, tx_packet.length,
         "Round %d: Payload should match", round);
 
@@ -195,27 +290,25 @@ ZTEST(fusain_fuzz, test_fuzz_crc)
   }
 }
 
-/* Fuzz byte stuffing edge cases */
+/* Fuzz byte stuffing edge cases - tests addresses with special bytes */
 ZTEST(fusain_fuzz, test_fuzz_byte_stuffing)
 {
   int stuffed_count = 0;
 
   for (int round = 0; round < CONFIG_FUSAIN_TEST_FUZZ_ROUNDS; round++) {
     fusain_packet_t packet;
-    packet.length = (fuzz_rand() % FUSAIN_MAX_PAYLOAD_SIZE) + 1;
-    packet.msg_type = fuzz_rand_byte();
+    fuzz_create_random_packet(&packet);
 
-    /* Occasionally inject special bytes to force stuffing */
+    /* Force special bytes in the address to trigger byte stuffing */
     bool force_stuffing = (round % 10) == 0;
-    for (int i = 0; i < packet.length; i++) {
-      if (force_stuffing && (i % 3) == 0) {
-        /* Force special bytes */
-        uint8_t special[] = { FUSAIN_START_BYTE,
-          FUSAIN_END_BYTE, FUSAIN_ESC_BYTE };
-        packet.payload[i] = special[fuzz_rand() % 3];
-      } else {
-        packet.payload[i] = fuzz_rand_byte();
+    if (force_stuffing) {
+      uint8_t special[] = { FUSAIN_START_BYTE, FUSAIN_END_BYTE, FUSAIN_ESC_BYTE };
+      /* Create an address with special bytes embedded */
+      uint64_t addr = 0;
+      for (int i = 0; i < 8; i++) {
+        addr |= ((uint64_t)special[fuzz_rand() % 3]) << (i * 8);
       }
+      packet.address = addr;
     }
 
     /* Encode and decode */
@@ -236,6 +329,8 @@ ZTEST(fusain_fuzz, test_fuzz_byte_stuffing)
 
     zassert_equal(result, FUSAIN_DECODE_OK,
         "Round %d: Decoding should succeed", round);
+    zassert_equal(rx_packet.address, packet.address,
+        "Round %d: Address should survive stuffing", round);
     zassert_mem_equal(rx_packet.payload, packet.payload, packet.length,
         "Round %d: Payload should survive stuffing", round);
 
@@ -254,21 +349,14 @@ ZTEST(fusain_fuzz, test_fuzz_decoder_errors)
   int error_recovery_count = 0;
 
   for (int round = 0; round < CONFIG_FUSAIN_TEST_FUZZ_ROUNDS; round++) {
-    /* Create valid packet */
+    /* Create valid CBOR packet */
     fusain_packet_t tx_packet;
-    tx_packet.length = (fuzz_rand() % 20) + 1; /* Smaller for faster test */
-    tx_packet.msg_type = fuzz_rand_byte();
-
-    for (int i = 0; i < tx_packet.length; i++) {
-      tx_packet.payload[i] = fuzz_rand_byte();
-    }
+    fuzz_create_random_packet(&tx_packet);
 
     uint8_t buffer[FUSAIN_MAX_PACKET_SIZE * 2];
     int encoded_len = fusain_encode_packet(&tx_packet, buffer, sizeof(buffer));
 
-    if (encoded_len < 0) {
-      continue;
-    }
+    zassert_true(encoded_len > 0, "Round %d: Encoding should succeed", round);
 
     /* Inject random corruption */
     if (encoded_len > 5) {
@@ -296,13 +384,11 @@ ZTEST(fusain_fuzz, test_fuzz_decoder_errors)
 
       /* Reset and try valid packet */
       fusain_reset_decoder(&decoder);
-      encoded_len = fusain_encode_packet(&tx_packet, buffer,
-          sizeof(buffer));
+      encoded_len = fusain_encode_packet(&tx_packet, buffer, sizeof(buffer));
 
       result = FUSAIN_DECODE_INCOMPLETE;
       for (int i = 0; i < encoded_len; i++) {
-        result = fusain_decode_byte(buffer[i], &rx_packet,
-            &decoder);
+        result = fusain_decode_byte(buffer[i], &rx_packet, &decoder);
       }
 
       zassert_equal(result, FUSAIN_DECODE_OK,
@@ -313,94 +399,5 @@ ZTEST(fusain_fuzz, test_fuzz_decoder_errors)
   printk("Fuzz decoder errors: %d error recoveries\n", error_recovery_count);
 }
 
-/* Fuzz v2.0 packet creation functions */
-ZTEST(fusain_fuzz, test_fuzz_v2_packets)
-{
-  for (int round = 0; round < CONFIG_FUSAIN_TEST_FUZZ_ROUNDS; round++) {
-    fusain_packet_t packet;
-
-    /* Test different v2.0 packet types */
-    switch (round % 8) {
-    case 0: {
-      fusain_cmd_motor_config_t config = {
-        .motor = fuzz_rand(),
-        .pwm_period = fuzz_rand(),
-        .pid_kp = (double)fuzz_rand() / 1000.0,
-        .pid_ki = (double)fuzz_rand() / 1000.0,
-        .pid_kd = (double)fuzz_rand() / 1000.0,
-        .max_rpm = fuzz_rand(),
-        .min_rpm = fuzz_rand(),
-        .min_pwm_duty = fuzz_rand(),
-      };
-      fusain_create_motor_config(&packet, 0, &config);
-      break;
-    }
-    case 1: {
-      fusain_cmd_pump_config_t config = {
-        .pump = fuzz_rand(),
-        .pulse_ms = fuzz_rand(),
-        .recovery_ms = fuzz_rand(),
-      };
-      fusain_create_pump_config(&packet, 0, &config);
-      break;
-    }
-    case 2: {
-      fusain_cmd_temp_config_t config = {
-        .thermometer = fuzz_rand(),
-        .pid_kp = (double)fuzz_rand() / 1000.0,
-        .pid_ki = (double)fuzz_rand() / 1000.0,
-        .pid_kd = (double)fuzz_rand() / 1000.0,
-        .sample_count = fuzz_rand(),
-        .read_rate = fuzz_rand(),
-      };
-      fusain_create_temp_config(&packet, 0, &config);
-      break;
-    }
-    case 3: {
-      fusain_cmd_glow_config_t config = {
-        .glow = fuzz_rand(),
-        .max_duration_ms = fuzz_rand(),
-      };
-      fusain_create_glow_config(&packet, 0, &config);
-      break;
-    }
-    case 4:
-      fusain_create_data_subscription(
-          &packet, 0, (uint64_t)fuzz_rand() << 32 | fuzz_rand());
-      break;
-    case 5:
-      fusain_create_data_unsubscribe(
-          &packet, 0, (uint64_t)fuzz_rand() << 32 | fuzz_rand());
-      break;
-    case 6:
-      fusain_create_discovery_request(&packet, 0);
-      break;
-    case 7:
-      fusain_create_device_announce(&packet, 0, fuzz_rand_byte(),
-          fuzz_rand_byte(), fuzz_rand_byte(), fuzz_rand_byte());
-      break;
-    }
-
-    /* Encode and decode */
-    uint8_t buffer[FUSAIN_MAX_PACKET_SIZE * 2];
-    int len = fusain_encode_packet(&packet, buffer, sizeof(buffer));
-
-    zassert_true(len > 0, "Round %d: v2.0 packet should encode", round);
-
-    fusain_decoder_t decoder;
-    fusain_reset_decoder(&decoder);
-
-    fusain_packet_t rx_packet;
-    fusain_decode_result_t result = FUSAIN_DECODE_INCOMPLETE;
-
-    for (int i = 0; i < len; i++) {
-      result = fusain_decode_byte(buffer[i], &rx_packet, &decoder);
-    }
-
-    zassert_equal(result, FUSAIN_DECODE_OK,
-        "Round %d: v2.0 packet should decode", round);
-  }
-}
-
-/* Test suite setup */
-ZTEST_SUITE(fusain_fuzz, NULL, NULL, NULL, NULL, NULL);
+/* Test suite setup - prints seed at start for reproducibility */
+ZTEST_SUITE(fusain_fuzz, NULL, fuzz_suite_setup, NULL, NULL, NULL);

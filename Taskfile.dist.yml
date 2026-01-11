@@ -2,6 +2,17 @@
 # yaml-language-server: $schema=https://taskfile.dev/schema.json
 version: "3"
 
+vars:
+  CDDL_PATH: ../../../origin/documentation/source/specifications/fusain/fusain.cddl
+  CDDL_TYPES: >-
+    motor-config-payload pump-config-payload temp-config-payload glow-config-payload
+    data-subscription-payload telemetry-config-payload timeout-config-payload
+    state-command-payload motor-command-payload pump-command-payload glow-command-payload
+    temp-command-payload send-telemetry-payload
+    state-data-payload motor-data-payload pump-data-payload glow-data-payload
+    temp-data-payload device-announce-payload ping-response-payload
+    error-invalid-cmd-payload error-state-reject-payload
+
 env:
   BOARD: native_sim
 
@@ -16,7 +27,7 @@ tasks:
 
   clean:
     desc: Clean build artifacts
-    cmd: rm -rf build
+    cmd: rm -rf build tests/build twister-out twister-out.*
 
   auto-build:
     desc: Build the Fusain library automatically when files are saved
@@ -43,111 +54,117 @@ tasks:
     desc: Run Fusain test suite with optional fuzz round count (e.g., 'task test -- 420')
     vars:
       ROUNDS: '{{default "100" .CLI_ARGS}}'
+      SEED:
+        sh: "od -An -tx4 -N4 /dev/urandom | tr -d ' '"
     cmds:
-      - |
-        if [ -n "{{.CLI_ARGS}}" ]; then
-          rm -rf twister-out twister-out.*
-          west twister -T tests -x CONFIG_FUSAIN_TEST_FUZZ_ROUNDS={{.ROUNDS}} --enable-slow -v
-        else
-          west twister -T tests --enable-slow -v
-        fi
-        TEST_EXIT=$?
-        if [ $TEST_EXIT -eq 0 ]; then
-          echo "Tests passed - cleaning up artifacts"
-          rm -rf twister-out twister-out.*
-        else
-          echo "Tests failed - preserving artifacts for debugging"
-          exit $TEST_EXIT
-        fi
+      - 'echo "Using fuzz seed: 0x{{.SEED}}"'
+      - rm -rf twister-out twister-out.*
+      - 'west twister -T tests -x CONFIG_FUSAIN_TEST_FUZZ_ROUNDS={{.ROUNDS}} -x CONFIG_FUSAIN_TEST_FUZZ_SEED=0x{{.SEED}} --enable-slow -v'
+      - rm -rf twister-out twister-out.*
 
   test-functional:
     desc: Run only functional tests (no fuzzing, no round count)
+    vars:
+      SEED:
+        sh: "od -An -tx4 -N4 /dev/urandom | tr -d ' '"
     cmds:
-      - |
-        west twister -T tests -s libraries.fusain.functional -v
-        TEST_EXIT=$?
-        if [ $TEST_EXIT -eq 0 ]; then
-          echo "Tests passed - cleaning up artifacts"
-          rm -rf twister-out twister-out.*
-        else
-          echo "Tests failed - preserving artifacts for debugging"
-          exit $TEST_EXIT
-        fi
+      - 'echo "Using fuzz seed: 0x{{.SEED}}"'
+      - rm -rf twister-out twister-out.*
+      - 'west twister -T tests -s libraries.fusain.functional -x CONFIG_FUSAIN_TEST_FUZZ_SEED=0x{{.SEED}} -v'
+      - rm -rf twister-out twister-out.*
 
   test-fuzz:
     desc: Run only fuzz tests with optional round count (e.g., 'task test-fuzz -- 5000')
     vars:
       ROUNDS: '{{default "1000" .CLI_ARGS}}'
+      SEED:
+        sh: "od -An -tx4 -N4 /dev/urandom | tr -d ' '"
     cmds:
+      - 'echo "Using fuzz seed: 0x{{.SEED}}"'
+      - rm -rf twister-out twister-out.*
+      - 'west twister -T tests -s libraries.fusain.fuzz -x CONFIG_FUSAIN_TEST_FUZZ_ROUNDS={{.ROUNDS}} -x CONFIG_FUSAIN_TEST_FUZZ_SEED=0x{{.SEED}} --enable-slow -v'
+      - rm -rf twister-out twister-out.*
+
+  coverage:
+    desc: Run Zephyr tests with coverage report
+    cmds:
+      - rm -rf tests/build
+      - west build -b native_sim -d tests/build tests -- -DEXTRA_CONF_FILE=coverage.conf
+      - tests/build/zephyr/zephyr.exe
       - |
-        if [ -n "{{.CLI_ARGS}}" ]; then
-          rm -rf twister-out twister-out.*
-          west twister -T tests -s libraries.fusain.fuzz -x CONFIG_FUSAIN_TEST_FUZZ_ROUNDS={{.ROUNDS}} --enable-slow -v
-        else
-          west twister -T tests -s libraries.fusain.fuzz --enable-slow -v
-        fi
-        TEST_EXIT=$?
-        if [ $TEST_EXIT -eq 0 ]; then
-          echo "Tests passed - cleaning up artifacts"
-          rm -rf twister-out twister-out.*
-        else
-          echo "Tests failed - preserving artifacts for debugging"
-          exit $TEST_EXIT
-        fi
+        echo ""
+        echo "Coverage report (fusain sources only):"
+        gcovr \
+          --filter 'src/fusain\.c$' \
+          --filter 'src/fusain_net_buf\.c$' \
+          tests/build
+
+  coverage-check:
+    desc: Verify Zephyr test coverage meets thresholds (100% fusain.c, 90% fusain_net_buf.c)
+    cmds:
+      - rm -rf tests/build
+      - west build -b native_sim -d tests/build tests -- -DEXTRA_CONF_FILE=coverage.conf
+      - tests/build/zephyr/zephyr.exe
+      - 'echo ""'
+      - 'echo "Checking coverage on fusain.c (must be 100%)..."'
+      - gcovr --root . --filter 'src/fusain\.c$' --fail-under-line 100 tests/build
+      - 'echo "Coverage check passed: 100% line coverage on fusain.c"'
+      - 'echo ""'
+      - 'echo "Checking coverage on fusain_net_buf.c (must be >= 90%)..."'
+      - gcovr --root . --filter 'src/fusain_net_buf\.c$' --fail-under-line 90 tests/build
+      - 'echo "Coverage check passed: >= 90% line coverage on fusain_net_buf.c"'
 
   format:
     desc: Format C source files using clang-format
     cmds:
       - clang-format -i src/*.c include/fusain/*.h tests/src/*.c
-      - clang-format -i tests/standalone/*.c tests/standalone/zephyr/*.h
+      - clang-format -i tests/standalone/*.c tests/standalone/zephyr/*.h tests/standalone/zephyr/random/*.h
 
   format-check:
     desc: Check if C source files are formatted correctly
     cmds:
-      - |
-        RESULT=$(clang-format --dry-run --Werror src/*.c include/fusain/*.h tests/src/*.c tests/standalone/*.c tests/standalone/zephyr/*.h 2>&1)
-        if [ $? -ne 0 ]; then
-          echo "Formatting issues found:"
-          echo "$RESULT"
-          echo ""
-          echo "Run 'task format' to fix formatting issues."
-          exit 1
-        else
-          echo "All files are correctly formatted."
-        fi
+      - clang-format --dry-run --Werror src/*.c include/fusain/*.h tests/src/*.c tests/standalone/*.c tests/standalone/zephyr/*.h tests/standalone/zephyr/random/*.h
+      - echo "All files are correctly formatted."
 
   ci:
-    desc: Run CI checks - format check and test suite with 1,000,000 fuzz rounds
+    desc: Run all CI checks - format, coverage, and fuzz tests
     cmds:
       - echo "Running CI checks..."
       - echo ""
+      - echo "1. Format check..."
       - task: format-check
       - echo ""
-      - echo "Running test suite with 1,000,000 fuzz rounds..."
-      - echo "This will take several minutes. Please be patient."
+      - echo "2. Standalone tests with 100% coverage verification..."
+      - task: standalone-coverage-check
+      - echo ""
+      - echo "3. Standalone fuzz tests with 1,000,000 rounds..."
+      - task: standalone-fuzz
+        vars:
+          CLI_ARGS: "1000000"
+      - echo ""
+      - echo "4. Zephyr tests with coverage verification..."
+      - task: coverage-check
+      - echo ""
+      - echo "5. Zephyr fuzz tests with 5,000,000 rounds..."
       - task: test
         vars:
           CLI_ARGS: "5000000"
+      - echo ""
+      - echo "All CI checks passed!"
 
   install-git-hooks:
     desc: Install pre-commit hook that runs CI tests
+    preconditions:
+      - sh: test -d .git
+        msg: "Error: Not in a git repository. Run this from the fusain directory."
+      - sh: test -f git-hooks/pre-commit
+        msg: "Error: git-hooks/pre-commit not found."
     cmds:
+      - mkdir -p .git/hooks
+      - cp git-hooks/pre-commit .git/hooks/pre-commit
+      - chmod +x .git/hooks/pre-commit
       - |
-        if [ ! -d ".git" ]; then
-          echo "Error: Not in a git repository. Run this from the fusain directory."
-          exit 1
-        fi
-
-        if [ ! -f "git-hooks/pre-commit" ]; then
-          echo "Error: git-hooks/pre-commit not found."
-          exit 1
-        fi
-
-        mkdir -p .git/hooks
-        cp git-hooks/pre-commit .git/hooks/pre-commit
-        chmod +x .git/hooks/pre-commit
-
-        echo "✓ Pre-commit hook installed at .git/hooks/pre-commit"
+        echo "Pre-commit hook installed at .git/hooks/pre-commit"
         echo ""
         echo "The hook will run on every commit and check:"
         echo "  1. Code formatting (fast)"
@@ -155,6 +172,27 @@ tasks:
         echo ""
         echo "To skip the hook for a commit, use: git commit --no-verify"
         echo "To uninstall: rm .git/hooks/pre-commit"
+
+  # ============================================================
+  # CBOR Code Generation
+  # ============================================================
+
+  zcbor-generate:
+    desc: Regenerate CBOR code from fusain.cddl schema
+    sources:
+      - "{{.CDDL_PATH}}"
+    generates:
+      - src/generated/fusain_cbor.c
+      - src/generated/fusain_cbor.h
+    cmds:
+      - mkdir -p src/generated
+      - zcbor code
+          --cddl {{.CDDL_PATH}}
+          --output-c src/generated/fusain_cbor.c
+          --output-h src/generated/fusain_cbor.h
+          -t {{.CDDL_TYPES}}
+          --decode --encode
+      - wc -l src/generated/*
 
   # ============================================================
   # Standalone Mode Tasks (no Zephyr required)
@@ -197,38 +235,51 @@ tasks:
       - build-standalone/tests/standalone/fusain_tests
       - |
         echo ""
-        echo "Coverage report:"
-        gcovr --root . --filter src/ build-standalone 2>/dev/null || \
+        echo "Coverage report (excluding generated code):"
+        gcovr --root . --filter 'src/fusain\.c$' build-standalone 2>/dev/null || \
         (echo "gcovr not found. Install with: pip install gcovr" && \
          echo "Falling back to basic gcov..." && \
          cd build-standalone/CMakeFiles/fusain.dir/src && gcov fusain.c.gcno && cat fusain.c.gcov | head -100)
 
   standalone-coverage-check:
-    desc: Verify 100% test coverage (fails if coverage < 100%)
+    desc: Verify 100% test coverage on fusain.c (excludes generated code)
     cmds:
       - mkdir -p coverage-standalone
       - cmake -B build-standalone -DFUSAIN_BUILD_TESTS=ON -DCMAKE_C_FLAGS="--coverage -fprofile-arcs -ftest-coverage"
       - cmake --build build-standalone
       - build-standalone/tests/standalone/fusain_tests
-      - |
-        echo ""
-        echo "Checking coverage (must be 100%)..."
-        gcovr --root . --filter src/ --fail-under-line 100 build-standalone
-        if [ $? -eq 0 ]; then
-          echo "Coverage check passed: 100% line coverage"
-        else
-          echo ""
-          echo "Coverage check FAILED: coverage is below 100%"
-          exit 1
-        fi
+      - echo ""
+      - 'echo "Checking coverage on src/fusain.c (must be 100%)..."'
+      - gcovr --root . --filter 'src/fusain\.c$' --fail-under-line 100 build-standalone
+      - 'echo "Coverage check passed: 100% line coverage on fusain.c"'
+
+  standalone-fuzz:
+    desc: Run standalone fuzz tests with optional round count (e.g., 'task standalone-fuzz -- 5000')
+    vars:
+      ROUNDS: '{{default "1000" .CLI_ARGS}}'
+      SEED:
+        sh: "od -An -tx4 -N4 /dev/urandom | tr -d ' '"
+    cmds:
+      - 'echo "Using fuzz seed: 0x{{.SEED}}"'
+      - rm -rf build-standalone
+      - cmake -B build-standalone -DFUSAIN_BUILD_TESTS=ON -DFUSAIN_FUZZ_ROUNDS={{.ROUNDS}} -DFUSAIN_FUZZ_SEED=0x{{.SEED}}
+      - cmake --build build-standalone
+      - build-standalone/tests/standalone/fusain_tests
 
   standalone-ci:
-    desc: Run standalone CI checks - format, tests, and 100% coverage
+    desc: Run standalone CI checks (no Zephyr required) - format, coverage, fuzz
     cmds:
-      - echo "Running fusain standalone CI checks..."
+      - echo "Running standalone CI checks..."
       - echo ""
+      - echo "1. Format check..."
       - task: format-check
       - echo ""
+      - echo "2. Standalone tests with 100% coverage verification..."
       - task: standalone-coverage-check
+      - echo ""
+      - echo "3. Standalone fuzz tests with 1,000,000 rounds..."
+      - task: standalone-fuzz
+        vars:
+          CLI_ARGS: "1000000"
       - echo ""
       - echo "Standalone CI checks passed!"

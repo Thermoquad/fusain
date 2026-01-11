@@ -8,4 +8,13 @@ config FUSAIN_TEST_FUZZ_ROUNDS
 	  Higher values increase coverage of edge cases.
 	  Functional tests use fixed test cases and do not use this config.
 
+config FUSAIN_TEST_FUZZ_SEED
+	hex "Fuzz test random seed"
+	default 0x0
+	help
+	  Seed for the fuzz test random number generator.
+	  Set to 0 for random seed (default), or specify a
+	  hex value to reproduce a specific test failure.
+	  The seed is printed at the start of each fuzz test run.
+
 source "Kconfig.zephyr"

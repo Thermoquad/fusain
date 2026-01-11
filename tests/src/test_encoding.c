@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * Fusain Protocol Library - Packet Encoding Tests
+ *
+ * Wire format: [START][LENGTH][ADDRESS(8)][CBOR_PAYLOAD][CRC(2)][END]
+ * CBOR payload contains [msg_type, payload_map]
  */
 
 #include <fusain/fusain.h>
@@ -14,7 +17,7 @@ ZTEST(fusain_encoding, test_encode_basic)
 {
   fusain_packet_t packet = {
     .length = 5,
-    .msg_type = FUSAIN_MSG_PING_REQUEST,
+    .msg_type = 0x30, /* For routing purposes only, msg_type is in CBOR */
   };
   memcpy(packet.payload, "HELLO", 5);
 
@@ -26,20 +29,20 @@ ZTEST(fusain_encoding, test_encode_basic)
   zassert_equal(buffer[len - 1], FUSAIN_END_BYTE, "Last byte should be END");
 }
 
-/* Test encoding with empty payload */
+/* Test encoding with minimal CBOR payload */
 ZTEST(fusain_encoding, test_encode_empty_payload)
 {
-  fusain_packet_t packet = {
-    .length = 0,
-    .msg_type = FUSAIN_MSG_DISCOVERY_REQUEST,
-  };
+  /* In CBOR mode, even "empty" messages have at least [type, nil] = 3-4 bytes
+   * Create a packet using create_ping_request which has nil payload */
+  fusain_packet_t packet;
+  fusain_create_ping_request(&packet, 0);
 
   uint8_t buffer[FUSAIN_MAX_PACKET_SIZE * 2];
   int len = fusain_encode_packet(&packet, buffer, sizeof(buffer));
 
-  zassert_true(len > 0, "Empty payload should encode successfully");
-  zassert_true(len >= FUSAIN_MIN_PACKET_SIZE,
-      "Encoded size should be at least minimum packet size");
+  zassert_true(len > 0, "Minimal CBOR payload should encode successfully");
+  /* Minimum: START(1) + LENGTH(1) + ADDR(8) + CBOR(3+) + CRC(2) + END(1) = 16+ */
+  zassert_true(len >= 16, "Encoded size should be at least minimum");
 }
 
 /* Test encoding with maximum payload */
@@ -47,7 +50,7 @@ ZTEST(fusain_encoding, test_encode_max_payload)
 {
   fusain_packet_t packet = {
     .length = FUSAIN_MAX_PAYLOAD_SIZE,
-    .msg_type = FUSAIN_MSG_STATE_DATA,
+    .msg_type = 0x30,
   };
 
   /* Fill with pattern */
@@ -68,7 +71,7 @@ ZTEST(fusain_encoding, test_encode_byte_stuffing)
 {
   fusain_packet_t packet = {
     .length = 3,
-    .msg_type = FUSAIN_START_BYTE, /* Requires escaping */
+    .msg_type = 0x30,
   };
   packet.payload[0] = FUSAIN_START_BYTE; /* Requires escaping */
   packet.payload[1] = FUSAIN_END_BYTE; /* Requires escaping */
@@ -95,13 +98,14 @@ ZTEST(fusain_encoding, test_encode_errors)
 {
   fusain_packet_t packet = {
     .length = 10,
-    .msg_type = FUSAIN_MSG_STATE_COMMAND,
+    .msg_type = 0x20,
   };
 
-  uint8_t buffer[10];
+  uint8_t small_buffer[10];
+  uint8_t large_buffer[FUSAIN_MAX_PACKET_SIZE * 2];
 
   /* Test NULL packet */
-  int len = fusain_encode_packet(NULL, buffer, sizeof(buffer));
+  int len = fusain_encode_packet(NULL, small_buffer, sizeof(small_buffer));
   zassert_true(len < 0, "NULL packet should fail");
 
   /* Test NULL buffer */
@@ -109,13 +113,13 @@ ZTEST(fusain_encoding, test_encode_errors)
   zassert_true(len < 0, "NULL buffer should fail");
 
   /* Test buffer too small */
-  len = fusain_encode_packet(&packet, buffer, 2);
+  len = fusain_encode_packet(&packet, small_buffer, 2);
   zassert_true(len < 0, "Too small buffer should fail");
 
-  /* Test invalid payload length */
+  /* Test invalid payload length (use large buffer so we hit length check) */
   packet.length = FUSAIN_MAX_PAYLOAD_SIZE + 1;
-  len = fusain_encode_packet(&packet, buffer, sizeof(buffer));
-  zassert_true(len < 0, "Oversized payload should fail");
+  len = fusain_encode_packet(&packet, large_buffer, sizeof(large_buffer));
+  zassert_equal(len, -2, "Oversized payload should return -2");
 }
 
 /* Test encoding determinism */
@@ -123,7 +127,7 @@ ZTEST(fusain_encoding, test_encode_determinism)
 {
   fusain_packet_t packet = {
     .length = 8,
-    .msg_type = FUSAIN_MSG_MOTOR_DATA,
+    .msg_type = 0x31,
   };
   memcpy(packet.payload, "TESTDATA", 8);
 
@@ -149,29 +153,25 @@ ZTEST(fusain_encoding, test_encode_buffer_overflow_stages)
   uint8_t buffer[256];
   int len;
 
-  /* Buffer size 0 - fails initial validation (line 67) */
+  /* Buffer size 0 - fails initial validation */
   len = fusain_encode_packet(&packet, buffer, 0);
   zassert_equal(len, -1, "Size 0 should fail validation");
 
-  /* Buffer too small after START - fails at LENGTH stuffing (line 96) */
+  /* Buffer too small after START - fails at LENGTH */
   len = fusain_encode_packet(&packet, buffer, 2);
   zassert_true(len < 0, "Size 2 should fail during LENGTH stuffing");
 
-  /* Buffer exhausted during ADDRESS stuffing (line 103) */
+  /* Buffer exhausted during ADDRESS stuffing */
   len = fusain_encode_packet(&packet, buffer, 5);
   zassert_true(len < 0, "Size 5 should fail during ADDRESS stuffing");
 
-  /* Buffer exhausted during TYPE stuffing (line 109) */
-  len = fusain_encode_packet(&packet, buffer, 10);
-  zassert_true(len < 0, "Size 10 should fail during TYPE stuffing");
+  /* Buffer exhausted during CRC stuffing */
+  len = fusain_encode_packet(&packet, buffer, 11);
+  zassert_true(len < 0, "Size 11 should fail during CRC stuffing");
 
-  /* Buffer exhausted during CRC stuffing (lines 123, 126) */
+  /* Buffer exhausted at END byte */
   len = fusain_encode_packet(&packet, buffer, 12);
-  zassert_true(len < 0, "Size 12 should fail during CRC stuffing");
-
-  /* Buffer exhausted at END byte (line 131) */
-  len = fusain_encode_packet(&packet, buffer, 13);
-  zassert_true(len < 0, "Size 13 should fail at END byte");
+  zassert_true(len < 0, "Size 12 should fail at END byte");
 }
 
 /* Test buffer overflow during payload stuffing */
@@ -187,8 +187,9 @@ ZTEST(fusain_encoding, test_encode_payload_overflow)
   uint8_t buffer[20];
   int len;
 
-  /* Buffer too small for payload (line 115) */
-  len = fusain_encode_packet(&packet, buffer, 15);
+  /* Buffer too small for payload
+   * Need: START(1) + LENGTH(1) + ADDR(8) + PAYLOAD(10) + CRC(2) + END(1) = 23 */
+  len = fusain_encode_packet(&packet, buffer, 18);
   zassert_true(len < 0, "Should fail during payload stuffing");
 }
 
@@ -196,27 +197,26 @@ ZTEST(fusain_encoding, test_encode_payload_overflow)
 ZTEST(fusain_encoding, test_encode_escape_overflow)
 {
   fusain_packet_t packet = {
-    .length = 1,
+    .length = 3,
     .address = 0,
     .msg_type = 0x30,
   };
-  /* Payload byte that requires escaping */
+  /* Payload bytes that require escaping */
   packet.payload[0] = FUSAIN_START_BYTE;
+  packet.payload[1] = FUSAIN_END_BYTE;
+  packet.payload[2] = FUSAIN_ESC_BYTE;
 
   uint8_t buffer[256];
   int len;
 
-  /*
-   * With escaping, the payload byte needs 2 bytes.
-   * A minimal packet with 1-byte payload needs:
-   * START(1) + LENGTH(1) + ADDR(8) + TYPE(1) + PAYLOAD(2 escaped) + CRC(2) + END(1) = 16
-   * Size 15 should fail when trying to stuff the escaped payload byte (line 49)
-   */
-  len = fusain_encode_packet(&packet, buffer, 15);
-  zassert_true(len < 0, "Should fail when escaping payload byte");
+  /* With escaping, the 3 payload bytes need 6 bytes.
+   * Minimal packet needs: START(1) + LENGTH(1) + ADDR(8) + PAYLOAD(6) + CRC(2) + END(1) = 19
+   * Size 18 should fail */
+  len = fusain_encode_packet(&packet, buffer, 18);
+  zassert_true(len < 0, "Should fail when escaping payload bytes");
 }
 
-/* Test stuff_byte normal byte overflow (line 56) */
+/* Test stuff_byte normal byte overflow */
 ZTEST(fusain_encoding, test_encode_normal_byte_overflow)
 {
   fusain_packet_t packet = {
@@ -229,42 +229,37 @@ ZTEST(fusain_encoding, test_encode_normal_byte_overflow)
   uint8_t buffer[256];
   int len;
 
-  /*
-   * Packet with 5 normal payload bytes needs:
-   * START(1) + LENGTH(1) + ADDR(8) + TYPE(1) + PAYLOAD(5) + CRC(2) + END(1) = 19
-   * Size 17 should fail during normal payload byte stuffing (line 56)
-   */
-  len = fusain_encode_packet(&packet, buffer, 17);
+  /* Packet with 5 normal payload bytes needs:
+   * START(1) + LENGTH(1) + ADDR(8) + PAYLOAD(5) + CRC(2) + END(1) = 18
+   * Size 16 should fail during normal payload byte stuffing */
+  len = fusain_encode_packet(&packet, buffer, 16);
   zassert_true(len < 0, "Should fail during normal byte stuffing");
 }
 
-/* Test overflow when msg_type needs escaping (line 109) */
+/* Test overflow when address bytes need escaping */
 ZTEST(fusain_encoding, test_encode_type_escape_overflow)
 {
   fusain_packet_t packet = {
     .length = 0,
-    /* 3 address bytes need escaping: index after address = 1 + 1 + (3*2 + 5) = 13 */
-    .address = 0x007E7E7E, /* Low 3 bytes are START_BYTE */
-    .msg_type = FUSAIN_START_BYTE, /* 0x7E needs escaping - 2 bytes */
+    .address = 0x007E7E7E, /* Low 3 bytes are START_BYTE and need escaping */
+    .msg_type = 0x30,
   };
 
   uint8_t buffer[256];
   int len;
 
-  /*
-   * With 3 escaped address bytes: index = 13 after address
-   * TYPE needs escape: check 13 + 2 > 14 => TRUE, fail at line 109
-   */
-  len = fusain_encode_packet(&packet, buffer, 14);
-  zassert_true(len < 0, "Should fail when TYPE needs escaping");
+  /* With 3 escaped address bytes (6 bytes total for those 3):
+   * START(1) + LENGTH(1) + ADDR(5 normal + 6 escaped = 11) + CRC(2) + END(1) = 16
+   * Size 13 should fail during address escaping */
+  len = fusain_encode_packet(&packet, buffer, 13);
+  zassert_true(len < 0, "Should fail when ADDRESS bytes need escaping");
 }
 
-/* Test overflow when address byte needs escaping (line 103) */
+/* Test overflow when address byte needs escaping */
 ZTEST(fusain_encoding, test_encode_address_escape_overflow)
 {
   fusain_packet_t packet = {
     .length = 0,
-    /* Multiple address bytes need escaping to overflow during address stuffing */
     .address = 0x7E7E7E7E7E7E7E7EULL, /* All 8 bytes are START_BYTE */
     .msg_type = 0x30,
   };
@@ -272,53 +267,37 @@ ZTEST(fusain_encoding, test_encode_address_escape_overflow)
   uint8_t buffer[256];
   int len;
 
-  /*
-   * With all 8 address bytes needing escape:
-   * START(1) + LENGTH(1) + ADDR(16) + TYPE(1) + CRC(2) + END(1) = 22
-   * Buffer size 14 should fail during address byte 5 stuffing (line 103)
-   */
+  /* With all 8 address bytes needing escape (16 bytes):
+   * START(1) + LENGTH(1) + ADDR(16) + CRC(2) + END(1) = 21
+   * Buffer size 14 should fail during address byte stuffing */
   len = fusain_encode_packet(&packet, buffer, 14);
   zassert_true(len < 0, "Should fail when ADDRESS bytes need escaping");
 }
 
-/* Test overflow when CRC high byte needs escaping (line 123) */
+/* Test overflow during CRC stuffing */
 ZTEST(fusain_encoding, test_encode_crc_escape_overflow)
 {
-  /*
-   * To fail at CRC stuffing, we need index to be high enough that
-   * CRC stuffing overflows. Since CRC depends on data, we use
-   * address bytes that need escaping to consume buffer space,
-   * leaving just enough room to reach CRC but not complete it.
-   */
   fusain_packet_t packet = {
     .length = 0,
-    /* 2 escaped address bytes + 6 normal = index = 1 + 1 + (2*2 + 6) = 12 after addr */
     .address = 0x00007E7E, /* Low 2 bytes need escaping */
-    .msg_type = 0x42, /* Normal, doesn't need escaping, index = 13 after type */
+    .msg_type = 0x42,
   };
 
   uint8_t buffer[256];
   int len;
 
-  /*
-   * After TYPE: index = 13
-   * CRC high: if it needs escape, check 13 + 2 > 14 => TRUE, fail at line 123
-   * If CRC high doesn't need escape: index = 14, then CRC low check...
-   * Either way, buffer 14 is too small for this packet.
-   * Let's test with buffer = 14.
-   */
-  len = fusain_encode_packet(&packet, buffer, 14);
+  /* With 2 escaped address bytes:
+   * START(1) + LENGTH(1) + ADDR(6 normal + 4 escaped = 10) + CRC(2) + END(1) = 15
+   * Buffer 13 should fail at CRC stuffing or END */
+  len = fusain_encode_packet(&packet, buffer, 13);
   zassert_true(len < 0, "Should fail during CRC stuffing or END");
 }
 
-/* Test stuff_byte escape overflow path specifically (line 49) */
+/* Test stuff_byte escape overflow path specifically */
 ZTEST(fusain_encoding, test_stuff_byte_escape_boundary)
 {
-  /*
-   * Create scenario where we have exactly 1 byte left in buffer
-   * but need to write an escaped byte (2 bytes).
-   * Use a large payload with escape bytes at the end.
-   */
+  /* Create scenario where we have exactly 1 byte left in buffer
+   * but need to write an escaped byte (2 bytes). */
   fusain_packet_t packet = {
     .length = 100,
     .address = 0,
@@ -332,12 +311,10 @@ ZTEST(fusain_encoding, test_stuff_byte_escape_boundary)
   uint8_t buffer[256];
   int len;
 
-  /*
-   * Normal encoding: START(1) + LENGTH(1) + ADDR(8) + TYPE(1) + PAYLOAD(100) + CRC(2) + END(1) = 114
-   * With one escaped byte in payload: 115
-   * Try buffer of 114 to trigger escape overflow
-   */
-  len = fusain_encode_packet(&packet, buffer, 114);
+  /* Normal encoding: START(1) + LENGTH(1) + ADDR(8) + PAYLOAD(100) + CRC(2) + END(1) = 113
+   * With one escaped byte in payload: 114
+   * Try buffer of 113 to trigger escape overflow */
+  len = fusain_encode_packet(&packet, buffer, 113);
   zassert_true(len < 0, "Should fail when escape needs 2 bytes but only 1 left");
 }
 

@@ -46,17 +46,17 @@ ZTEST(fusain_crc, test_crc_various_lengths)
   uint8_t data[FUSAIN_MAX_PAYLOAD_SIZE];
 
   /* Fill with pattern */
-  for (int i = 0; i < sizeof(data); i++) {
-    data[i] = i & 0xFF;
+  for (size_t i = 0; i < sizeof(data); i++) {
+    data[i] = (uint8_t)(i & 0xFF);
   }
 
   /* Test different lengths */
   uint16_t prev_crc = 0xFFFF;
-  for (int len = 1; len <= sizeof(data); len++) {
+  for (size_t len = 1; len <= sizeof(data); len++) {
     uint16_t crc = fusain_crc16(data, len);
     /* Each length should produce a different CRC */
     zassert_not_equal(crc, prev_crc,
-        "Different lengths should produce different CRCs (len=%d)",
+        "Different lengths should produce different CRCs (len=%zu)",
         len);
     prev_crc = crc;
   }

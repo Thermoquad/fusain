@@ -7,22 +7,37 @@
 # 1. ZEPHYR MODE: As a Zephyr module (detected via ZEPHYR_BASE)
 # 2. STANDALONE MODE: As a portable C library for any application
 #
+# CBOR encoding/decoding is provided by zcbor-generated code from fusain.cddl.
+# Regenerate with: task zcbor-generate
+#
 cmake_minimum_required(VERSION 3.20.0)
 
 # Detect Zephyr context BEFORE project() declaration
 if(ZEPHYR_BASE)
   # ============================================================
   # ZEPHYR MODE - Build as Zephyr module
+  # Uses Zephyr's native CRC (crc16_itu_t) and zcbor runtime.
   # ============================================================
   if(CONFIG_FUSAIN)
     set(ZEPHYR_CURRENT_LIBRARY fusain)
     zephyr_include_directories(${ZEPHYR_CURRENT_MODULE_DIR}/include)
+    zephyr_include_directories(${ZEPHYR_CURRENT_MODULE_DIR}/src/generated)
     zephyr_library()
-    zephyr_library_sources(${ZEPHYR_CURRENT_MODULE_DIR}/src/fusain.c)
+    zephyr_library_sources(
+      ${ZEPHYR_CURRENT_MODULE_DIR}/src/fusain.c
+      ${ZEPHYR_CURRENT_MODULE_DIR}/src/generated/fusain_cbor_encode.c
+      ${ZEPHYR_CURRENT_MODULE_DIR}/src/generated/fusain_cbor_decode.c
+    )
+    if(CONFIG_FUSAIN_NET_BUF)
+      zephyr_library_sources(
+        ${ZEPHYR_CURRENT_MODULE_DIR}/src/fusain_net_buf.c
+      )
+    endif()
   endif()
 else()
   # ============================================================
   # STANDALONE MODE - Build as portable C library
+  # Uses built-in CRC and zcbor-generated CBOR code.
   # ============================================================
   project(fusain
     VERSION 1.0.0
@@ -30,13 +45,32 @@ else()
     LANGUAGES C
   )
 
+  # Fetch zcbor for standalone builds (provides zcbor runtime)
+  include(FetchContent)
+  FetchContent_Declare(
+    zcbor
+    GIT_REPOSITORY https://github.com/NordicSemiconductor/zcbor.git
+    GIT_TAG        0.9.1
+    GIT_SHALLOW    TRUE
+  )
+  FetchContent_MakeAvailable(zcbor)
+
   # Library target
-  add_library(fusain STATIC src/fusain.c)
+  add_library(fusain STATIC
+    src/fusain.c
+    src/generated/fusain_cbor_encode.c
+    src/generated/fusain_cbor_decode.c
+    ${zcbor_SOURCE_DIR}/src/zcbor_common.c
+    ${zcbor_SOURCE_DIR}/src/zcbor_encode.c
+    ${zcbor_SOURCE_DIR}/src/zcbor_decode.c
+  )
   add_library(Fusain::fusain ALIAS fusain)
 
   # Include directories with generator expressions for build/install
   target_include_directories(fusain PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/generated>
+    $<BUILD_INTERFACE:${zcbor_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
   )
 
