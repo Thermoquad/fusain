@@ -385,7 +385,7 @@ void fusain_create_state_command(fusain_packet_t* packet, uint64_t address,
 }
 
 void fusain_create_pump_command(fusain_packet_t* packet, uint64_t address,
-    int32_t pump, int32_t rate_ms)
+    uint8_t pump, int32_t rate_ms)
 {
   packet->address = address;
   packet->msg_type = FUSAIN_MSG_PUMP_COMMAND;
@@ -416,7 +416,7 @@ void fusain_create_pump_command(fusain_packet_t* packet, uint64_t address,
 }
 
 void fusain_create_motor_command(fusain_packet_t* packet, uint64_t address,
-    int32_t motor, int32_t rpm)
+    uint8_t motor, int32_t rpm)
 {
   packet->address = address;
   packet->msg_type = FUSAIN_MSG_MOTOR_COMMAND;
@@ -452,7 +452,7 @@ void fusain_create_motor_command(fusain_packet_t* packet, uint64_t address,
   packet->length = (uint8_t)(offset + payload_len);
 }
 
-void fusain_create_glow_command(fusain_packet_t* packet, uint64_t address, int32_t glow,
+void fusain_create_glow_command(fusain_packet_t* packet, uint64_t address, uint8_t glow,
     int32_t duration)
 {
   packet->address = address;
@@ -484,8 +484,8 @@ void fusain_create_glow_command(fusain_packet_t* packet, uint64_t address, int32
 }
 
 void fusain_create_temp_command(fusain_packet_t* packet, uint64_t address,
-    int32_t thermometer, fusain_temp_cmd_type_t type, int32_t motor_index,
-    double target_temp)
+    uint8_t thermometer, fusain_temp_cmd_type_t type, uint8_t motor_index,
+    float target_temp)
 {
   packet->address = address;
   packet->msg_type = FUSAIN_MSG_TEMP_COMMAND;
@@ -638,7 +638,7 @@ void fusain_create_send_telemetry(fusain_packet_t* packet, uint64_t address,
 }
 
 void fusain_create_state_data(fusain_packet_t* packet, uint64_t address,
-    uint32_t error, int32_t code, fusain_state_t state, uint32_t timestamp)
+    uint32_t error, uint8_t code, fusain_state_t state, uint32_t timestamp)
 {
   packet->address = address;
   packet->msg_type = FUSAIN_MSG_STATE_DATA;
@@ -975,7 +975,7 @@ void fusain_create_device_announce(fusain_packet_t* packet, uint64_t address,
 }
 
 void fusain_create_motor_data(fusain_packet_t* packet, uint64_t address,
-    int32_t motor, uint32_t timestamp, int32_t rpm, int32_t target)
+    uint8_t motor, uint32_t timestamp, int32_t rpm, int32_t target)
 {
   packet->address = address;
   packet->msg_type = FUSAIN_MSG_MOTOR_DATA;
@@ -1012,7 +1012,7 @@ void fusain_create_motor_data(fusain_packet_t* packet, uint64_t address,
 }
 
 void fusain_create_pump_data(fusain_packet_t* packet, uint64_t address,
-    int32_t pump, uint32_t timestamp, fusain_pump_event_t type, int32_t rate)
+    uint8_t pump, uint32_t timestamp, fusain_pump_event_t type, int32_t rate)
 {
   packet->address = address;
   packet->msg_type = FUSAIN_MSG_PUMP_DATA;
@@ -1046,7 +1046,7 @@ void fusain_create_pump_data(fusain_packet_t* packet, uint64_t address,
 }
 
 void fusain_create_glow_data(fusain_packet_t* packet, uint64_t address,
-    int32_t glow, uint32_t timestamp, bool lit)
+    uint8_t glow, uint32_t timestamp, bool lit)
 {
   packet->address = address;
   packet->msg_type = FUSAIN_MSG_GLOW_DATA;
@@ -1078,7 +1078,7 @@ void fusain_create_glow_data(fusain_packet_t* packet, uint64_t address,
 }
 
 void fusain_create_temp_data(fusain_packet_t* packet, uint64_t address,
-    int32_t thermometer, uint32_t timestamp, double reading)
+    uint8_t thermometer, uint32_t timestamp, float reading)
 {
   packet->address = address;
   packet->msg_type = FUSAIN_MSG_TEMP_DATA;

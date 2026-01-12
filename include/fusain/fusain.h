@@ -94,27 +94,6 @@ typedef enum {
   FUSAIN_ERROR_COMMANDED_ESTOP = 0x07,
 } fusain_error_t;
 
-/* Command Payloads */
-typedef struct __attribute__((packed)) {
-  uint32_t mode; // fusain_mode_t (0=IDLE, 1=FAN, 2=HEAT, 3=EMERGENCY)
-  int32_t argument; // Mode-specific: RPM for FAN, pump rate for HEAT, 0 otherwise
-} fusain_cmd_set_mode_t;
-
-typedef struct __attribute__((packed)) {
-  int32_t pump; // Pump index (0-9, typically 0)
-  int32_t rate_ms; // Pulse interval in milliseconds (0=stop, >=100=run)
-} fusain_cmd_set_pump_rate_t;
-
-typedef struct __attribute__((packed)) {
-  int32_t motor; // Motor index (0-9, typically 0)
-  int32_t rpm; // Target RPM (0=stop, 800-3400=run)
-} fusain_cmd_set_target_rpm_t;
-
-typedef struct __attribute__((packed)) {
-  int32_t glow; // Glow plug index (0-9, typically 0)
-  int32_t duration; // Burn duration in milliseconds (0-300000)
-} fusain_cmd_glow_t;
-
 /* Temperature command types */
 typedef enum {
   FUSAIN_TEMP_CMD_WATCH_MOTOR = 0,
@@ -124,31 +103,9 @@ typedef enum {
   FUSAIN_TEMP_CMD_SET_TARGET_TEMP = 4,
 } fusain_temp_cmd_type_t;
 
-typedef struct __attribute__((packed)) {
-  int32_t thermometer; // Temperature controller index (0-9, typically 0)
-  uint32_t type; // fusain_temp_cmd_type_t
-  int32_t motor_index; // Motor to control (used with WATCH_MOTOR)
-  double target_temp; // Target temperature in Celsius (used with SET_TARGET_TEMP)
-} fusain_cmd_temp_command_t;
-
-typedef struct __attribute__((packed)) {
-  uint32_t telemetry_enabled; // 0 = disabled, 1 = enabled
-  uint32_t interval_ms; // Telemetry broadcast interval (0 = polling, 100-5000 ms)
-} fusain_cmd_telemetry_config_t;
-
-typedef struct __attribute__((packed)) {
-  uint32_t enabled; // 0 = disabled, 1 = enabled
-  uint32_t timeout_ms; // Timeout interval in milliseconds (5000-60000)
-} fusain_cmd_timeout_config_t;
-
-typedef struct __attribute__((packed)) {
-  uint32_t telemetry_type; // 0=STATE, 1=MOTOR, 2=TEMP, 3=PUMP, 4=GLOW
-  uint32_t index; // Peripheral index or 0xFFFFFFFF for all
-} fusain_cmd_send_telemetry_t;
-
-/* Configuration Command Payloads */
-typedef struct __attribute__((packed)) {
-  int32_t motor;
+/* Configuration Command Payloads (used by fusain_create_*_config APIs) */
+typedef struct {
+  uint8_t motor;
   uint32_t pwm_period;
   double pid_kp;
   double pid_ki;
@@ -158,61 +115,25 @@ typedef struct __attribute__((packed)) {
   uint32_t min_pwm_duty;
 } fusain_cmd_motor_config_t;
 
-typedef struct __attribute__((packed)) {
-  int32_t pump;
+typedef struct {
+  uint8_t pump;
   uint32_t pulse_ms;
   uint32_t recovery_ms;
 } fusain_cmd_pump_config_t;
 
-typedef struct __attribute__((packed)) {
-  int32_t thermometer;
+typedef struct {
+  uint8_t thermometer;
   double pid_kp;
   double pid_ki;
   double pid_kd;
 } fusain_cmd_temp_config_t;
 
-typedef struct __attribute__((packed)) {
-  int32_t glow;
+typedef struct {
+  uint8_t glow;
   uint32_t max_duration_ms;
 } fusain_cmd_glow_config_t;
 
-typedef struct __attribute__((packed)) {
-  uint64_t appliance_address;
-} fusain_cmd_data_subscription_t;
-
-typedef struct __attribute__((packed)) {
-  uint64_t appliance_address;
-} fusain_cmd_data_unsubscribe_t;
-
-/* Data Payloads */
-typedef struct __attribute__((packed)) {
-  uint32_t error; // Error flag (0=no error, 1=error)
-  int32_t code; // Error code (fusain_error_t)
-  uint32_t state; // fusain_state_t
-  uint32_t timestamp; // Timestamp in milliseconds since boot
-} fusain_data_state_t;
-
-typedef struct __attribute__((packed)) {
-  int32_t motor; // Motor index
-  uint32_t timestamp; // Reading timestamp in milliseconds since boot
-  int32_t rpm; // Current measured RPM
-  int32_t target; // Target RPM setpoint
-  int32_t max_rpm; // Maximum achievable RPM
-  int32_t min_rpm; // Minimum stable RPM
-  int32_t pwm; // Current PWM pulse width in microseconds
-  int32_t pwm_max; // PWM period in microseconds
-} fusain_data_motor_t;
-
-typedef struct __attribute__((packed)) {
-  int32_t thermometer; // Thermometer index
-  uint32_t timestamp; // Reading timestamp in milliseconds since boot
-  double reading; // Temperature in Celsius
-  uint32_t temperature_rpm_control; // Temperature-based RPM control active (0 = inactive, 1 = active)
-  int32_t watched_motor; // Motor being controlled (-1 = none)
-  double target_temperature; // Target temperature for PID control
-} fusain_data_temperature_t;
-
-/* Pump event types */
+/* Pump event types (used by fusain_create_pump_data API) */
 typedef enum {
   FUSAIN_PUMP_EVENT_INITIALIZING = 0,
   FUSAIN_PUMP_EVENT_READY = 1,
@@ -221,39 +142,6 @@ typedef enum {
   FUSAIN_PUMP_EVENT_PULSE_END = 4,
   FUSAIN_PUMP_EVENT_CYCLE_END = 5,
 } fusain_pump_event_t;
-
-typedef struct __attribute__((packed)) {
-  int32_t pump; // Pump index
-  uint32_t timestamp; // Event timestamp in milliseconds since boot
-  uint32_t type; // fusain_pump_event_t
-  int32_t rate; // Current pump rate in milliseconds
-} fusain_data_pump_t;
-
-typedef struct __attribute__((packed)) {
-  int32_t glow; // Glow plug index
-  uint32_t timestamp; // Status timestamp in milliseconds since boot
-  uint32_t lit; // Lit status (0 = off, 1 = lit)
-} fusain_data_glow_t;
-
-typedef struct __attribute__((packed)) {
-  uint32_t uptime_ms; // System uptime in milliseconds (wraps at 2^32)
-} fusain_data_ping_response_t;
-
-typedef struct __attribute__((packed)) {
-  uint8_t motor_count; // Number of motors this device has
-  uint8_t thermometer_count; // Number of temperature sensors
-  uint8_t pump_count; // Number of pumps
-  uint8_t glow_count; // Number of glow plugs
-} fusain_data_device_announce_t;
-
-/* Error Message Payloads */
-typedef struct __attribute__((packed)) {
-  int32_t error_code; // 1 = invalid parameter, 2 = invalid device index
-} fusain_error_invalid_cmd_t;
-
-typedef struct __attribute__((packed)) {
-  int32_t error_code; // Current state that rejected the command
-} fusain_error_state_reject_t;
 
 /* Packet Structure */
 typedef struct {
@@ -349,7 +237,7 @@ void fusain_create_state_command(fusain_packet_t* packet, uint64_t address,
  * @param rate_ms Pulse interval in milliseconds (0=stop, >=100=run)
  */
 void fusain_create_pump_command(fusain_packet_t* packet, uint64_t address,
-    int32_t pump, int32_t rate_ms);
+    uint8_t pump, int32_t rate_ms);
 
 /**
  * Create a MOTOR_COMMAND packet
@@ -360,7 +248,7 @@ void fusain_create_pump_command(fusain_packet_t* packet, uint64_t address,
  * @param rpm Target RPM (0=stop, 800-3400=run)
  */
 void fusain_create_motor_command(fusain_packet_t* packet, uint64_t address,
-    int32_t motor, int32_t rpm);
+    uint8_t motor, int32_t rpm);
 
 /**
  * Create a GLOW_COMMAND packet
@@ -370,7 +258,7 @@ void fusain_create_motor_command(fusain_packet_t* packet, uint64_t address,
  * @param glow Glow plug index (0-9, typically 0)
  * @param duration Burn duration in milliseconds (0-300000)
  */
-void fusain_create_glow_command(fusain_packet_t* packet, uint64_t address, int32_t glow,
+void fusain_create_glow_command(fusain_packet_t* packet, uint64_t address, uint8_t glow,
     int32_t duration);
 
 /**
@@ -384,8 +272,8 @@ void fusain_create_glow_command(fusain_packet_t* packet, uint64_t address, int32
  * @param target_temp Target temperature in Celsius (used with SET_TARGET_TEMP)
  */
 void fusain_create_temp_command(fusain_packet_t* packet, uint64_t address,
-    int32_t thermometer, fusain_temp_cmd_type_t type, int32_t motor_index,
-    double target_temp);
+    uint8_t thermometer, fusain_temp_cmd_type_t type, uint8_t motor_index,
+    float target_temp);
 
 /**
  * Create a PING_REQUEST packet
@@ -500,7 +388,7 @@ void fusain_create_discovery_request(fusain_packet_t* packet, uint64_t address);
  * @param timestamp Timestamp in milliseconds since boot
  */
 void fusain_create_state_data(fusain_packet_t* packet, uint64_t address,
-    uint32_t error, int32_t code, fusain_state_t state, uint32_t timestamp);
+    uint32_t error, uint8_t code, fusain_state_t state, uint32_t timestamp);
 
 /**
  * Create a PING_RESPONSE packet
@@ -536,7 +424,7 @@ void fusain_create_device_announce(fusain_packet_t* packet, uint64_t address,
  * @param target Target RPM setpoint
  */
 void fusain_create_motor_data(fusain_packet_t* packet, uint64_t address,
-    int32_t motor, uint32_t timestamp, int32_t rpm, int32_t target);
+    uint8_t motor, uint32_t timestamp, int32_t rpm, int32_t target);
 
 /**
  * Create a PUMP_DATA packet
@@ -549,7 +437,7 @@ void fusain_create_motor_data(fusain_packet_t* packet, uint64_t address,
  * @param rate Current pump rate in milliseconds
  */
 void fusain_create_pump_data(fusain_packet_t* packet, uint64_t address,
-    int32_t pump, uint32_t timestamp, fusain_pump_event_t type, int32_t rate);
+    uint8_t pump, uint32_t timestamp, fusain_pump_event_t type, int32_t rate);
 
 /**
  * Create a GLOW_DATA packet
@@ -561,7 +449,7 @@ void fusain_create_pump_data(fusain_packet_t* packet, uint64_t address,
  * @param lit Lit status (true = on, false = off)
  */
 void fusain_create_glow_data(fusain_packet_t* packet, uint64_t address,
-    int32_t glow, uint32_t timestamp, bool lit);
+    uint8_t glow, uint32_t timestamp, bool lit);
 
 /**
  * Create a TEMP_DATA packet
@@ -573,7 +461,7 @@ void fusain_create_glow_data(fusain_packet_t* packet, uint64_t address,
  * @param reading Temperature reading in Celsius
  */
 void fusain_create_temp_data(fusain_packet_t* packet, uint64_t address,
-    int32_t thermometer, uint32_t timestamp, double reading);
+    uint8_t thermometer, uint32_t timestamp, float reading);
 
 /**
  * Create an ERROR_INVALID_CMD packet
@@ -594,19 +482,6 @@ void fusain_create_error_invalid_cmd(fusain_packet_t* packet, uint64_t address,
  */
 void fusain_create_error_state_reject(fusain_packet_t* packet, uint64_t address,
     fusain_state_t state);
-
-/**
- * Fusain state command message (for Zbus/IPC)
- *
- * This structure is used for inter-process communication (e.g., Zbus)
- * to request mode changes via Fusain. It is NOT the protocol packet format.
- *
- * For the wire protocol representation, see fusain_cmd_set_mode_t.
- */
-typedef struct {
-  fusain_mode_t mode; // Target mode (IDLE, FAN, HEAT, EMERGENCY)
-  uint32_t parameter; // Mode parameter (RPM for FAN, pump rate for HEAT)
-} fusain_state_command_msg_t;
 
 /* Net Buffer API (Zephyr only) */
 #ifdef CONFIG_FUSAIN_NET_BUF

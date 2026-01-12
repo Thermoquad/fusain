@@ -41,8 +41,8 @@ else()
   # Uses built-in CRC and zcbor-generated CBOR code.
   # ============================================================
   project(fusain
-    VERSION 1.0.0
-    DESCRIPTION "Fusain Serial Protocol Library"
+    VERSION 0.0.1
+    DESCRIPTION "Fusain Protocol Library"
     LANGUAGES C
   )
 

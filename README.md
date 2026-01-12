@@ -1,6 +1,8 @@
 # Fusain Protocol Library
 
-Reusable C library for encoding and decoding Fusain serial protocol packets.
+> **Also known as:** "C Fusain" — the C implementation of the Fusain protocol.
+
+Reusable C library for encoding and decoding Fusain protocol packets.
 
 **Fusain** (fossilized charcoal) provides a platform-independent implementation of the Fusain communication protocol.
 

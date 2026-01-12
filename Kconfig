@@ -2,14 +2,14 @@
 # SPDX-License-Identifier: Apache-2.0
 
 menuconfig FUSAIN
-	bool "Fusain Serial Protocol Library"
+	bool "Fusain Protocol Library"
 	select ZCBOR
 	select CRC
 	help
-	  Enable the Fusain serial protocol encoder/decoder library.
+	  Enable the Fusain protocol encoder/decoder library.
 	  This library provides CBOR-encoded packet payloads, CRC-16-CCITT
 	  error detection, byte stuffing, and stateful packet decoding for
-	  the Fusain serial communication protocol.
+	  the Fusain protocol.
 
 	  In Zephyr mode, this library uses:
 	  - zcbor for CBOR encoding/decoding (auto-selected)
@@ -20,11 +20,11 @@ menuconfig FUSAIN
 if FUSAIN
 
 config FUSAIN_LOG_LEVEL
-	int "Fusain Serial Protocol Log Level"
+	int "Fusain Protocol Log Level"
 	default 3
 	range 0 4
 	help
-	  Set the log level for the Fusain serial protocol library.
+	  Set the log level for the Fusain protocol library.
 	  0 = OFF, 1 = ERROR, 2 = WARNING, 3 = INFO, 4 = DEBUG
 
 config FUSAIN_NET_BUF

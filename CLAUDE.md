@@ -1,12 +1,14 @@
-# Fusain Serial Protocol Library - AI Assistant Guide
+# Fusain Protocol Library - AI Assistant Guide
 
 > **Note:** This file documents the fusain module specifically.
 > Always read the [Thermoquad Organization CLAUDE.md](../../../CLAUDE.md) first
 > for organization-wide structure and conventions.
 
+> **Also known as:** "C Fusain" — the C implementation of the Fusain protocol.
+
 ## Module Overview
 
-**fusain** is a platform-independent C library that implements the Fusain serial communication protocol. It provides CRC-16-CCITT calculation, packet encoding with byte stuffing, and stateful packet decoding for reliable serial communication.
+**fusain** is a platform-independent C library that implements the Fusain protocol. It provides CRC-16-CCITT calculation, packet encoding with byte stuffing, and stateful packet decoding for reliable serial communication.
 
 **Key Features:**
 - Pure C implementation with zero dependencies beyond standard C library
@@ -25,7 +27,7 @@
 
 ### Protocol Design
 
-The Fusain serial protocol uses a binary packet format with CBOR-encoded payloads:
+The Fusain protocol uses a binary packet format with CBOR-encoded payloads:
 
 ```
 [START][LENGTH][ADDRESS][CBOR_PAYLOAD][CRC_HIGH][CRC_LOW][END]
@@ -574,7 +576,7 @@ target_include_directories(myapp PRIVATE
 ### Kconfig Options
 
 **CONFIG_FUSAIN** (bool)
-- Enable the Fusain serial protocol library
+- Enable the Fusain protocol library
 - Default: n
 
 **CONFIG_FUSAIN_LOG_LEVEL** (int)
