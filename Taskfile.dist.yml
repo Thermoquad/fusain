@@ -301,3 +301,29 @@ tasks:
           CLI_ARGS: "1000000"
       - echo ""
       - echo "Standalone CI checks passed!"
+
+  ci-in-docker:
+    desc: Run full CI in Docker container
+    vars:
+      ZEPHYR_SDK_VERSION:
+        sh: cat .zephyr-sdk-version
+      UID:
+        sh: id -u
+      GID:
+        sh: id -g
+    env:
+      CI_SCRIPT: |
+        set -e
+        python3 -m venv /tmp/venv
+        . /tmp/venv/bin/activate
+        pip install --quiet west gcovr
+        west init -l fusain
+        west update --narrow -o=--depth=1
+        export ZEPHYR_BASE=/workdir/zephyr
+        west packages pip --install
+        cd fusain
+        rm -rf build-standalone tests/build
+        task ci
+    cmds:
+      - docker build --build-arg ZEPHYR_SDK_VERSION={{.ZEPHYR_SDK_VERSION}} -t fusain-ci {{.ROOT_DIR}}
+      - docker run --rm --user {{.UID}}:{{.GID}} -e HOME=/tmp -v {{.ROOT_DIR}}:/workdir/fusain -w /workdir fusain-ci bash -c "${CI_SCRIPT}"

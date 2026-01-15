@@ -298,6 +298,46 @@ task standalone-coverage
 
 Requires `gcovr` (`pip install gcovr`).
 
+### CI
+
+**Fast Local Testing (no Zephyr required):**
+
+```bash
+task standalone-ci   # Format check + standalone tests + 1M fuzz rounds
+```
+
+This is the fastest way to validate changes locally without a full Zephyr environment.
+
+**Full Local Testing (requires Zephyr):**
+
+```bash
+task ci              # Full CI: format + standalone + Zephyr tests + 5M fuzz rounds
+task ci-in-docker    # Same as above, in Zephyr Docker container (auto-cleans build artifacts)
+```
+
+**Git Hooks:**
+
+Install the pre-commit hook to automatically run CI checks before each commit:
+
+```bash
+task install-git-hooks
+```
+
+The hook runs:
+1. `task format-check` - Fast formatting validation
+2. `task ci` - Full test suite (takes several minutes)
+
+Skip with `git commit --no-verify` when needed.
+
+**GitHub Actions:**
+
+The workflow runs automatically on push/PR to `master` branch:
+- Format check
+- Standalone tests with 100% coverage verification
+- Standalone fuzz tests (1M rounds)
+- Zephyr tests with coverage verification
+- Zephyr fuzz tests (5M rounds)
+
 ## Integration with Applications
 
 ### Appliance Firmware (Zephyr)

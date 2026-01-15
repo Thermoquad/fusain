@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: Apache-2.0
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: fusain
+
+      - name: Get SDK version
+        id: versions
+        run: echo "sdk=$(cat fusain/.zephyr-sdk-version)" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build CI image
+        uses: docker/build-push-action@v6
+        with:
+          context: fusain
+          load: true
+          tags: fusain-ci:latest
+          build-args: |
+            ZEPHYR_SDK_VERSION=${{ steps.versions.outputs.sdk }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Cache west modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            zephyr
+            modules
+            .west
+          key: west-${{ hashFiles('fusain/west.yml') }}
+
+      - name: Run CI
+        run: |
+          docker run --rm \
+            --user $(id -u):$(id -g) \
+            -v ${{ github.workspace }}:/workdir \
+            -w /workdir \
+            -e HOME=/tmp \
+            -e ZEPHYR_BASE=/workdir/zephyr \
+            fusain-ci:latest bash -c '
+              set -e
+              python3 -m venv /tmp/venv
+              . /tmp/venv/bin/activate
+              pip install --quiet west gcovr
+              if [ ! -d .west ]; then
+                west init -l fusain
+              fi
+              west update --narrow -o=--depth=1
+              export ZEPHYR_BASE=/workdir/zephyr
+              west packages pip --install
+              cd fusain
+              rm -rf build-standalone tests/build
+              task ci
+            '
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-artifacts
+          path: |
+            fusain/build-standalone/
+            fusain/tests/build/
+          retention-days: 7

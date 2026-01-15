@@ -186,6 +186,13 @@ fusain/
 ├── Taskfile.dist.yml       # Task runner (Zephyr + standalone tasks)
 ├── CMakeLists.txt          # Dual-mode build (Zephyr module + standalone CMake)
 ├── Kconfig                 # Zephyr configuration options
+├── west.yml                # West manifest for CI (Zephyr + zcbor dependencies)
+├── .zephyr-ci-docker-version  # Zephyr CI Docker image version
+├── .github/
+│   └── workflows/
+│       └── ci.yml          # GitHub Actions CI workflow
+├── git-hooks/
+│   └── pre-commit          # Pre-commit hook (install with task install-git-hooks)
 ├── zephyr/
 │   └── module.yml          # Zephyr module metadata
 ├── cmake/
@@ -695,6 +702,55 @@ task standalone-coverage      # Run with gcovr coverage report
 task standalone-ci            # Format check + tests + fuzz (1M rounds)
 task standalone-clean         # Clean build artifacts
 ```
+
+**CI Tasks:**
+```bash
+task standalone-ci   # Fast: format + standalone tests + 1M fuzz (no Zephyr required)
+task ci              # Full: format + standalone + Zephyr tests + 5M fuzz rounds
+task ci-in-docker    # Full CI in Zephyr Docker container (auto-cleans build artifacts)
+```
+
+Use `standalone-ci` for fast local validation during development. Use `ci` or `ci-in-docker` for full validation before commits. The `ci-in-docker` task mirrors the GitHub Actions workflow and automatically cleans up build artifacts after completion.
+
+### Git Hooks
+
+Install the pre-commit hook to automatically validate changes before each commit:
+
+```bash
+task install-git-hooks
+```
+
+**What the hook runs:**
+1. `task format-check` - Fast formatting validation
+2. `task ci` - Full test suite (format + standalone + Zephyr + 5M fuzz rounds)
+
+**Skip hook:** `git commit --no-verify` (use sparingly)
+
+**Uninstall:** `rm .git/hooks/pre-commit`
+
+### GitHub Actions CI
+
+The library includes a GitHub Actions workflow (`.github/workflows/ci.yml`) that runs the full test suite in the official Zephyr Docker container (`ghcr.io/zephyrproject-rtos/ci`).
+
+**Triggered on:** Push/PR to `master` branch
+
+**What it runs:**
+1. Format check (clang-format)
+2. Standalone tests with 100% coverage verification
+3. Standalone fuzz tests (1M rounds)
+4. Zephyr tests with coverage verification
+5. Zephyr fuzz tests (5M rounds)
+
+**Local reproduction:**
+```bash
+task ci-in-docker
+```
+
+This runs the same `task ci` command in the same Docker image used by GitHub Actions, ensuring local and CI environments match.
+
+**Version pinning:**
+- Docker image version is pinned in `.zephyr-ci-docker-version`
+- Zephyr version is pinned in `west.yml` (currently v4.3.0)
 
 ### Coverage
 
