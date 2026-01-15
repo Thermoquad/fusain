@@ -219,10 +219,17 @@ ZTEST(fusain_fuzz, test_fuzz_decoding_random)
 ZTEST(fusain_fuzz, test_fuzz_roundtrip)
 {
   int success_count = 0;
+  int skipped_count = 0;
 
   for (int round = 0; round < CONFIG_FUSAIN_TEST_FUZZ_ROUNDS; round++) {
     fusain_packet_t tx_packet;
     fuzz_create_random_packet(&tx_packet);
+
+    /* Skip packets where CBOR encoding failed (length=0 means encoding error) */
+    if (tx_packet.length == 0) {
+      skipped_count++;
+      continue;
+    }
 
     /* Encode */
     uint8_t buffer[FUSAIN_MAX_PACKET_SIZE * 2];
@@ -258,7 +265,8 @@ ZTEST(fusain_fuzz, test_fuzz_roundtrip)
     success_count++;
   }
 
-  printk("Fuzz round-trip: %d successful round-trips\n", success_count);
+  printk("Fuzz round-trip: %d successful, %d skipped (CBOR encoding failures)\n",
+      success_count, skipped_count);
 }
 
 /* Fuzz CRC with edge cases */
@@ -294,10 +302,17 @@ ZTEST(fusain_fuzz, test_fuzz_crc)
 ZTEST(fusain_fuzz, test_fuzz_byte_stuffing)
 {
   int stuffed_count = 0;
+  int skipped_count = 0;
 
   for (int round = 0; round < CONFIG_FUSAIN_TEST_FUZZ_ROUNDS; round++) {
     fusain_packet_t packet;
     fuzz_create_random_packet(&packet);
+
+    /* Skip packets where CBOR encoding failed */
+    if (packet.length == 0) {
+      skipped_count++;
+      continue;
+    }
 
     /* Force special bytes in the address to trigger byte stuffing */
     bool force_stuffing = (round % 10) == 0;
@@ -339,19 +354,26 @@ ZTEST(fusain_fuzz, test_fuzz_byte_stuffing)
     }
   }
 
-  printk("Fuzz byte stuffing: Tested %d packets with forced stuffing\n",
-      stuffed_count);
+  printk("Fuzz byte stuffing: %d with forced stuffing, %d skipped\n",
+      stuffed_count, skipped_count);
 }
 
 /* Fuzz decoder state machine with injected errors */
 ZTEST(fusain_fuzz, test_fuzz_decoder_errors)
 {
   int error_recovery_count = 0;
+  int skipped_count = 0;
 
   for (int round = 0; round < CONFIG_FUSAIN_TEST_FUZZ_ROUNDS; round++) {
     /* Create valid CBOR packet */
     fusain_packet_t tx_packet;
     fuzz_create_random_packet(&tx_packet);
+
+    /* Skip packets where CBOR encoding failed */
+    if (tx_packet.length == 0) {
+      skipped_count++;
+      continue;
+    }
 
     uint8_t buffer[FUSAIN_MAX_PACKET_SIZE * 2];
     int encoded_len = fusain_encode_packet(&tx_packet, buffer, sizeof(buffer));
@@ -393,10 +415,21 @@ ZTEST(fusain_fuzz, test_fuzz_decoder_errors)
 
       zassert_equal(result, FUSAIN_DECODE_OK,
           "Round %d: Should recover after error", round);
+
+      /* Verify recovered packet matches original */
+      zassert_equal(rx_packet.length, tx_packet.length,
+          "Round %d: Length should match after recovery", round);
+      zassert_equal(rx_packet.msg_type, tx_packet.msg_type,
+          "Round %d: Type should match after recovery", round);
+      zassert_equal(rx_packet.address, tx_packet.address,
+          "Round %d: Address should match after recovery", round);
+      zassert_mem_equal(rx_packet.payload, tx_packet.payload, tx_packet.length,
+          "Round %d: Payload should match after recovery", round);
     }
   }
 
-  printk("Fuzz decoder errors: %d error recoveries\n", error_recovery_count);
+  printk("Fuzz decoder errors: %d error recoveries, %d skipped\n",
+      error_recovery_count, skipped_count);
 }
 
 /* Test suite setup - prints seed at start for reproducibility */

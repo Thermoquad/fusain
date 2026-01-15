@@ -1113,7 +1113,8 @@ void fusain_create_temp_data(fusain_packet_t* packet, uint64_t address,
 }
 
 void fusain_create_error_invalid_cmd(fusain_packet_t* packet, uint64_t address,
-    int32_t error_code)
+    fusain_invalid_cmd_error_t error_code, int32_t rejected_field,
+    int32_t constraint)
 {
   packet->address = address;
   packet->msg_type = FUSAIN_MSG_ERROR_INVALID_CMD;
@@ -1128,8 +1129,20 @@ void fusain_create_error_invalid_cmd(fusain_packet_t* packet, uint64_t address,
   offset = (size_t)header_len;
 
   struct error_invalid_cmd_payload cbor_payload = {
-    .error_invalid_cmd_payload_uint0int = error_code,
+    .error_invalid_cmd_payload_uint0int = (int32_t)error_code,
+    .error_invalid_cmd_payload_uint1uint_present = (rejected_field >= 0),
+    .error_invalid_cmd_payload_constraint_m_present = (constraint >= 0),
   };
+  if (rejected_field >= 0) {
+    cbor_payload.error_invalid_cmd_payload_uint1uint
+        .error_invalid_cmd_payload_uint1uint
+        = (uint32_t)rejected_field;
+  }
+  if (constraint >= 0) {
+    cbor_payload.error_invalid_cmd_payload_constraint_m
+        .error_invalid_cmd_payload_constraint_m
+        = (uint32_t)constraint;
+  }
   size_t payload_len = 0;
   int ret = cbor_encode_error_invalid_cmd_payload(
       packet->payload + offset, FUSAIN_MAX_PAYLOAD_SIZE - offset,
@@ -1143,7 +1156,7 @@ void fusain_create_error_invalid_cmd(fusain_packet_t* packet, uint64_t address,
 }
 
 void fusain_create_error_state_reject(fusain_packet_t* packet, uint64_t address,
-    fusain_state_t state)
+    fusain_state_t state, int32_t rejection_reason)
 {
   packet->address = address;
   packet->msg_type = FUSAIN_MSG_ERROR_STATE_REJECT;
@@ -1158,8 +1171,14 @@ void fusain_create_error_state_reject(fusain_packet_t* packet, uint64_t address,
   offset = (size_t)header_len;
 
   struct error_state_reject_payload cbor_payload = {
-    .error_state_reject_payload_state_m = (uint32_t)state,
+    .error_state_reject_payload_uint0int = (int32_t)state,
+    .error_state_reject_payload_rejection_reason_m_present = (rejection_reason >= 0),
   };
+  if (rejection_reason >= 0) {
+    cbor_payload.error_state_reject_payload_rejection_reason_m
+        .error_state_reject_payload_rejection_reason_m
+        = (uint32_t)rejection_reason;
+  }
   size_t payload_len = 0;
   int ret = cbor_encode_error_state_reject_payload(
       packet->payload + offset, FUSAIN_MAX_PAYLOAD_SIZE - offset,

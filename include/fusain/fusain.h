@@ -103,6 +103,34 @@ typedef enum {
   FUSAIN_TEMP_CMD_SET_TARGET_TEMP = 4,
 } fusain_temp_cmd_type_t;
 
+/* Error codes for ERROR_INVALID_CMD */
+typedef enum {
+  FUSAIN_INVALID_CMD_INVALID_PARAM = 1, // Invalid parameter value
+  FUSAIN_INVALID_CMD_INVALID_INDEX = 2, // Invalid device index
+} fusain_invalid_cmd_error_t;
+
+/* Constraint types for ERROR_INVALID_CMD (optional field) */
+typedef enum {
+  FUSAIN_CONSTRAINT_UNSPECIFIED = 0, // No specific constraint
+  FUSAIN_CONSTRAINT_VALUE_TOO_LOW = 1, // Value below minimum allowed
+  FUSAIN_CONSTRAINT_VALUE_TOO_HIGH = 2, // Value above maximum allowed
+  FUSAIN_CONSTRAINT_VALUE_INVALID = 3, // Value is NaN, Infinity, or invalid
+  FUSAIN_CONSTRAINT_VALUE_CONFLICT = 4, // Value conflicts with another field
+  FUSAIN_CONSTRAINT_INDEX_NOT_FOUND = 5, // Device index does not exist
+  FUSAIN_CONSTRAINT_FIELD_REQUIRED = 6, // Required field is missing
+  FUSAIN_CONSTRAINT_TYPE_MISMATCH = 7, // Field has wrong CBOR type
+  FUSAIN_CONSTRAINT_OPERATION_BLOCKED = 8, // Operation not allowed
+  FUSAIN_CONSTRAINT_VALUE_IN_GAP = 9, // Value in invalid gap
+} fusain_constraint_t;
+
+/* Rejection reasons for ERROR_STATE_REJECT (optional field) */
+typedef enum {
+  FUSAIN_REJECTION_UNSPECIFIED = 0, // No specific reason
+  FUSAIN_REJECTION_RESOURCE_CONTROLLED = 1, // Resource controlled by state machine
+  FUSAIN_REJECTION_INVALID_IN_STATE = 2, // Operation not valid in current state
+  FUSAIN_REJECTION_TRANSITION_BLOCKED = 3, // State transition not allowed
+} fusain_rejection_reason_t;
+
 /* Configuration Command Payloads (used by fusain_create_*_config APIs) */
 typedef struct {
   uint8_t motor;
@@ -468,10 +496,13 @@ void fusain_create_temp_data(fusain_packet_t* packet, uint64_t address,
  *
  * @param packet Output packet
  * @param address Device address
- * @param error_code Error code (1 = invalid param, 2 = invalid device index)
+ * @param error_code Error code (fusain_invalid_cmd_error_t)
+ * @param rejected_field CBOR key of field that failed validation (-1 to omit)
+ * @param constraint Constraint violation type (-1 to omit, or fusain_constraint_t)
  */
 void fusain_create_error_invalid_cmd(fusain_packet_t* packet, uint64_t address,
-    int32_t error_code);
+    fusain_invalid_cmd_error_t error_code, int32_t rejected_field,
+    int32_t constraint);
 
 /**
  * Create an ERROR_STATE_REJECT packet
@@ -479,9 +510,11 @@ void fusain_create_error_invalid_cmd(fusain_packet_t* packet, uint64_t address,
  * @param packet Output packet
  * @param address Device address
  * @param state Current state that rejected the command
+ * @param rejection_reason Why the state rejected the command (-1 to omit,
+ *                         or fusain_rejection_reason_t)
  */
 void fusain_create_error_state_reject(fusain_packet_t* packet, uint64_t address,
-    fusain_state_t state);
+    fusain_state_t state, int32_t rejection_reason);
 
 /* Net Buffer API (Zephyr only) */
 #ifdef CONFIG_FUSAIN_NET_BUF

@@ -4,8 +4,8 @@
  * Generated with a --default-max-qty of 3
  */
 
-#ifndef CBOR_DECODE_H__
-#define CBOR_DECODE_H__
+#ifndef FUSAIN_CBOR_DECODE_H__
+#define FUSAIN_CBOR_DECODE_H__
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -158,4 +158,4 @@ int cbor_decode_error_state_reject_payload(
 }
 #endif
 
-#endif /* CBOR_DECODE_H__ */
+#endif /* FUSAIN_CBOR_DECODE_H__ */

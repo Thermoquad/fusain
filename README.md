@@ -315,6 +315,52 @@ Controller implementations should:
 - Send periodic PING_REQUEST to maintain connection
 - Handle telemetry messages for monitoring
 
+## Development
+
+### CBOR Code Generation
+
+The library uses zcbor to generate CBOR encoding/decoding code from the CDDL schema.
+
+**Schema Location:** `origin/documentation/source/specifications/fusain/fusain.cddl`
+
+**Regenerating CBOR Code:**
+
+When the CDDL schema changes (e.g., new message fields, modified payload structures), regenerate the CBOR code:
+
+```bash
+# From the fusain directory
+task zcbor-generate
+```
+
+**Important:** After generation, manual file operations are required because zcbor generates files with `fusain_cbor_*` prefix, but the codebase expects `cbor_*` prefix:
+
+```bash
+# Rename source files (keep only .c files in src/generated/)
+mv src/generated/fusain_cbor_decode.c src/generated/cbor_decode.c
+mv src/generated/fusain_cbor_encode.c src/generated/cbor_encode.c
+
+# Move headers to include/fusain/generated/
+mv src/generated/fusain_cbor_types.h include/fusain/generated/cbor_types.h
+mv src/generated/fusain_cbor_decode.h include/fusain/generated/cbor_decode.h
+mv src/generated/fusain_cbor_encode.h include/fusain/generated/cbor_encode.h
+
+# Fix internal includes in headers
+sed -i 's/fusain_cbor_types\.h/cbor_types.h/g' \
+    include/fusain/generated/cbor_decode.h include/fusain/generated/cbor_encode.h
+
+# Fix includes in source files to use proper paths
+sed -i 's|#include "fusain_cbor_decode.h"|#include <fusain/generated/cbor_decode.h>|g' src/generated/cbor_decode.c
+sed -i 's|#include "fusain_cbor_encode.h"|#include <fusain/generated/cbor_encode.h>|g' src/generated/cbor_encode.c
+```
+
+**After Regeneration:**
+
+1. Compare the new `cbor_types.h` against the old version for struct field name changes
+2. Update `src/fusain.c` to use any new field names from the regenerated types
+3. Run tests to verify: `task standalone-test`
+
+See `CLAUDE.md` for detailed documentation on the regeneration process.
+
 ## License
 
 Apache-2.0
