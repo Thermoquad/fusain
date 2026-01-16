@@ -1,5 +1,7 @@
 # Fusain Protocol Library
 
+[![CI](https://github.com/Thermoquad/fusain/actions/workflows/ci.yml/badge.svg)](https://github.com/Thermoquad/fusain/actions/workflows/ci.yml)
+
 > **Also known as:** "C Fusain" — the C implementation of the Fusain protocol.
 
 Reusable C library for encoding and decoding Fusain protocol packets.
@@ -351,7 +353,7 @@ See `apps/helios/src/communications/serial_handler.c` for reference implementati
 ### Controller Application
 Controller implementations should:
 - Use this library for protocol encoding/decoding
-- Implement UART/serial communication (platform-specific)
+- Implement transport-layer communication (UART, TCP, WebSocket, etc.)
 - Send periodic PING_REQUEST to maintain connection
 - Handle telemetry messages for monitoring
 
@@ -372,26 +374,11 @@ When the CDDL schema changes (e.g., new message fields, modified payload structu
 task zcbor-generate
 ```
 
-**Important:** After generation, manual file operations are required because zcbor generates files with `fusain_cbor_*` prefix, but the codebase expects `cbor_*` prefix:
-
-```bash
-# Rename source files (keep only .c files in src/generated/)
-mv src/generated/fusain_cbor_decode.c src/generated/cbor_decode.c
-mv src/generated/fusain_cbor_encode.c src/generated/cbor_encode.c
-
-# Move headers to include/fusain/generated/
-mv src/generated/fusain_cbor_types.h include/fusain/generated/cbor_types.h
-mv src/generated/fusain_cbor_decode.h include/fusain/generated/cbor_decode.h
-mv src/generated/fusain_cbor_encode.h include/fusain/generated/cbor_encode.h
-
-# Fix internal includes in headers
-sed -i 's/fusain_cbor_types\.h/cbor_types.h/g' \
-    include/fusain/generated/cbor_decode.h include/fusain/generated/cbor_encode.h
-
-# Fix includes in source files to use proper paths
-sed -i 's|#include "fusain_cbor_decode.h"|#include <fusain/generated/cbor_decode.h>|g' src/generated/cbor_decode.c
-sed -i 's|#include "fusain_cbor_encode.h"|#include <fusain/generated/cbor_encode.h>|g' src/generated/cbor_encode.c
-```
+This task automatically:
+1. Generates CBOR code from the CDDL schema
+2. Renames files from `fusain_cbor_*` to `cbor_*` prefix
+3. Moves headers to `include/fusain/generated/`
+4. Fixes include paths in generated files
 
 **After Regeneration:**
 
@@ -399,7 +386,7 @@ sed -i 's|#include "fusain_cbor_encode.h"|#include <fusain/generated/cbor_encode
 2. Update `src/fusain.c` to use any new field names from the regenerated types
 3. Run tests to verify: `task standalone-test`
 
-See `CLAUDE.md` for detailed documentation on the regeneration process.
+See `CLAUDE.md` for detailed documentation.
 
 ## License
 

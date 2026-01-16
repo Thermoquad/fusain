@@ -8,7 +8,7 @@
 
 ## Module Overview
 
-**fusain** is a platform-independent C library that implements the Fusain protocol. It provides CRC-16-CCITT calculation, packet encoding with byte stuffing, and stateful packet decoding for reliable serial communication.
+**fusain** is a platform-independent C library that implements the Fusain protocol. It provides CRC-16-CCITT calculation, packet encoding with byte stuffing, and stateful packet decoding for reliable communication.
 
 **Key Features:**
 - Pure C implementation with zero dependencies beyond standard C library
@@ -187,7 +187,8 @@ fusain/
 ├── CMakeLists.txt          # Dual-mode build (Zephyr module + standalone CMake)
 ├── Kconfig                 # Zephyr configuration options
 ├── west.yml                # West manifest for CI (Zephyr + zcbor dependencies)
-├── .zephyr-ci-docker-version  # Zephyr CI Docker image version
+├── Dockerfile              # CI container definition
+├── .zephyr-sdk-version     # Zephyr SDK version for CI
 ├── .github/
 │   └── workflows/
 │       └── ci.yml          # GitHub Actions CI workflow
@@ -200,13 +201,16 @@ fusain/
 ├── include/
 │   └── fusain/
 │       ├── fusain.h              # Public API header
-│       ├── fusain_cbor_types.h   # zcbor-generated CBOR type definitions
-│       ├── fusain_cbor_encode.h  # zcbor-generated encode functions
-│       └── fusain_cbor_decode.h  # zcbor-generated decode functions
+│       └── generated/            # zcbor-generated headers
+│           ├── cbor_types.h      # CBOR type definitions
+│           ├── cbor_decode.h     # Decode function declarations
+│           └── cbor_encode.h     # Encode function declarations
 ├── src/
 │   ├── fusain.c              # Protocol implementation
-│   ├── fusain_cbor_encode.c  # zcbor-generated CBOR encoding
-│   └── fusain_cbor_decode.c  # zcbor-generated CBOR decoding
+│   ├── fusain_net_buf.c      # Zephyr net_buf API (optional)
+│   └── generated/            # zcbor-generated sources
+│       ├── cbor_decode.c     # CBOR decoding functions
+│       └── cbor_encode.c     # CBOR encoding functions
 └── tests/
     ├── src/                # Zephyr test sources (ztest-based)
     │   ├── main.c
@@ -730,7 +734,7 @@ task install-git-hooks
 
 ### GitHub Actions CI
 
-The library includes a GitHub Actions workflow (`.github/workflows/ci.yml`) that runs the full test suite in the official Zephyr Docker container (`ghcr.io/zephyrproject-rtos/ci`).
+The library includes a GitHub Actions workflow (`.github/workflows/ci.yml`) that runs the full test suite using a custom Docker image built from the repository's `Dockerfile`.
 
 **Triggered on:** Push/PR to `master` branch
 
@@ -749,8 +753,10 @@ task ci-in-docker
 This runs the same `task ci` command in the same Docker image used by GitHub Actions, ensuring local and CI environments match.
 
 **Version pinning:**
-- Docker image version is pinned in `.zephyr-ci-docker-version`
+- Zephyr SDK version is pinned in `.zephyr-sdk-version`
 - Zephyr version is pinned in `west.yml` (currently v4.3.0)
+
+**Docker layer caching:** GitHub Actions caches Docker image layers for faster CI runs.
 
 ### Coverage
 
@@ -979,7 +985,7 @@ if (result == FUSAIN_DECODE_INVALID_CRC) {
 1. **Define message type in header:**
 
 ```c
-// In fusain_serial.h
+// In fusain.h
 typedef enum {
     // ... existing types ...
     FUSAIN_MSG_NEW_COMMAND = 0x16,
@@ -998,7 +1004,7 @@ typedef struct __attribute__((packed)) {
 3. **Create helper function (optional):**
 
 ```c
-// In fusain_serial.c
+// In fusain.c
 void fusain_create_new_command(fusain_packet_t* packet,
                                uint32_t field1,
                                uint8_t field2) {
@@ -1044,6 +1050,6 @@ To reload all organization CLAUDE.md files or run a content integrity check, see
 
 ---
 
-**Last Updated:** 2026-01-11
+**Last Updated:** 2026-01-15
 
 **Maintainer:** Kaz Walker
