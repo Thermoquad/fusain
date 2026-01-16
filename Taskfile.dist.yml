@@ -211,6 +211,10 @@ tasks:
       # Show results
       - echo "Generated files:"
       - wc -l src/generated/*.c include/fusain/generated/*.h
+      # Verify generated code compiles and passes tests
+      - echo ""
+      - echo "Verifying generated code with tests..."
+      - task: standalone-test
 
   # ============================================================
   # Standalone Mode Tasks (no Zephyr required)

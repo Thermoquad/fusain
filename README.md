@@ -379,12 +379,13 @@ This task automatically:
 2. Renames files from `fusain_cbor_*` to `cbor_*` prefix
 3. Moves headers to `include/fusain/generated/`
 4. Fixes include paths in generated files
+5. Runs tests to verify the generated code compiles and works correctly
 
 **After Regeneration:**
 
-1. Compare the new `cbor_types.h` against the old version for struct field name changes
+If the CDDL schema changed field names or types, you may need to:
+1. Compare the new `cbor_types.h` against the old version for struct field changes
 2. Update `src/fusain.c` to use any new field names from the regenerated types
-3. Run tests to verify: `task standalone-test`
 
 See `CLAUDE.md` for detailed documentation.
 

@@ -91,39 +91,24 @@ Source files are in `src/generated/`:
 - `cbor_decode.c` - CBOR decoding functions
 - `cbor_encode.c` - CBOR encoding functions
 
-**⚠️ CBOR Code Generation Process:**
+**CBOR Code Generation:**
 
-The `task zcbor-generate` command generates files with `fusain_cbor_*` prefix to
-`src/generated/`, but the code expects files with `cbor_*` prefix. After running
-`task zcbor-generate`, you must manually rename files and fix includes:
+When the CDDL schema changes, regenerate CBOR code with:
 
 ```bash
-# From fusain directory
 task zcbor-generate
-
-# Rename source files (keep only .c files in src/generated/)
-mv src/generated/fusain_cbor_decode.c src/generated/cbor_decode.c
-mv src/generated/fusain_cbor_encode.c src/generated/cbor_encode.c
-
-# Rename and move headers to include/fusain/generated/
-mv src/generated/fusain_cbor_types.h include/fusain/generated/cbor_types.h
-mv src/generated/fusain_cbor_decode.h include/fusain/generated/cbor_decode.h
-mv src/generated/fusain_cbor_encode.h include/fusain/generated/cbor_encode.h
-
-# Fix internal includes in headers (rename fusain_cbor_* to cbor_*)
-sed -i 's/fusain_cbor_types\.h/cbor_types.h/g' include/fusain/generated/cbor_decode.h include/fusain/generated/cbor_encode.h
-
-# Fix includes in source files to use angle-bracket paths
-sed -i 's|#include "fusain_cbor_decode.h"|#include <fusain/generated/cbor_decode.h>|g' src/generated/cbor_decode.c
-sed -i 's|#include "fusain_cbor_encode.h"|#include <fusain/generated/cbor_encode.h>|g' src/generated/cbor_encode.c
 ```
 
-**Note:** The `task zcbor-generate` command now automates all of these steps.
+This task automatically:
+1. Generates CBOR code from the CDDL schema
+2. Renames files from `fusain_cbor_*` to `cbor_*` prefix
+3. Moves headers to `include/fusain/generated/`
+4. Fixes include paths in generated files
+5. Runs tests to verify the generated code compiles and works correctly
 
-**After regenerating CBOR code:** The struct field names in generated types may
-change based on CDDL schema updates. The fusain.c implementation must be updated to
-use the new field names. Compare the new `cbor_types.h` against the old version and
-update all usages in fusain.c accordingly.
+**After regenerating CBOR code:** If the CDDL schema changed field names or types,
+you may need to compare the new `cbor_types.h` against the old version and update
+`src/fusain.c` to use any new field names from the regenerated types.
 
 ---
 
