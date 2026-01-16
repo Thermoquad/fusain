@@ -176,7 +176,8 @@ fusain/
 ├── .zephyr-sdk-version     # Zephyr SDK version for CI
 ├── .github/
 │   └── workflows/
-│       └── ci.yml          # GitHub Actions CI workflow
+│       ├── ci.yml               # GitHub Actions CI workflow
+│       └── validate-cddl.yml    # Weekly CDDL validation workflow
 ├── git-hooks/
 │   └── pre-commit          # Pre-commit hook (install with task install-git-hooks)
 ├── zephyr/
@@ -742,6 +743,39 @@ This runs the same `task ci` command in the same Docker image used by GitHub Act
 - Zephyr version is pinned in `west.yml` (currently v4.3.0)
 
 **Docker layer caching:** GitHub Actions caches Docker image layers for faster CI runs.
+
+### CDDL Validation Workflow
+
+The library includes a weekly validation workflow (`.github/workflows/validate-cddl.yml`) that ensures the C implementation stays in sync with the reference CDDL schema in the origin repository.
+
+**Triggered on:**
+- Schedule: Every Friday at 9:00 AM UTC (for weekend fixes)
+- Manual: Can be triggered via workflow_dispatch
+
+**What it does:**
+1. Checks out both fusain and origin repositories
+2. Saves the current generated CBOR code
+3. Regenerates CBOR code from the reference CDDL schema
+4. Compares the regenerated code with the current implementation
+5. If discrepancies are found:
+   - Uses GitHub Models API to generate an AI summary of the changes
+   - Creates or updates a GitHub issue with detailed analysis
+   - Labels the issue with `cddl-validation` and `protocol`
+
+**AI-powered analysis:**
+The workflow uses GitHub Models API (GPT-4o) to provide:
+- Summary of what changed in the schema vs implementation
+- Impact on C API or binary compatibility
+- Whether `src/fusain.c` needs updates
+- Severity classification (breaking change, enhancement, or fix)
+
+**Manual triggering:**
+```bash
+# Via GitHub CLI
+gh workflow run validate-cddl.yml --repo Thermoquad/fusain
+```
+
+This ensures the C implementation doesn't drift from the canonical CDDL specification over time.
 
 ### Coverage
 
