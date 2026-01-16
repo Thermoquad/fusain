@@ -400,7 +400,7 @@ void fusain_create_pump_command(fusain_packet_t* packet, uint64_t address,
   offset = (size_t)header_len;
 
   struct pump_command_payload cbor_payload = {
-    .pump_command_payload_pump_index_m = (uint32_t)pump,
+    .pump_command_payload_pump_index_m = (int32_t)pump,
     .pump_command_payload_uint1int = rate_ms,
   };
   size_t payload_len = 0;
@@ -435,7 +435,7 @@ void fusain_create_motor_command(fusain_packet_t* packet, uint64_t address,
 
   /* Encode payload map using zcbor-generated encoder */
   struct motor_command_payload cbor_payload = {
-    .motor_command_payload_motor_index_m = (uint32_t)motor,
+    .motor_command_payload_motor_index_m = (int32_t)motor,
     .motor_command_payload_uint1int = rpm,
   };
   size_t payload_len = 0;
@@ -468,7 +468,7 @@ void fusain_create_glow_command(fusain_packet_t* packet, uint64_t address, uint8
   offset = (size_t)header_len;
 
   struct glow_command_payload cbor_payload = {
-    .glow_command_payload_glow_index_m = (uint32_t)glow,
+    .glow_command_payload_glow_index_m = (int32_t)glow,
     .glow_command_payload_uint1int = duration,
   };
   size_t payload_len = 0;
@@ -500,9 +500,9 @@ void fusain_create_temp_command(fusain_packet_t* packet, uint64_t address,
   offset = (size_t)header_len;
 
   struct temp_command_payload cbor_payload = {
-    .temp_command_payload_thermometer_index_m = (uint32_t)thermometer,
+    .temp_command_payload_thermometer_index_m = (int32_t)thermometer,
     .temp_command_payload_temp_cmd_type_m = (uint32_t)type,
-    .temp_command_payload_motor_index_m = { .temp_command_payload_motor_index_m = (uint32_t)motor_index },
+    .temp_command_payload_motor_index_m = { .temp_command_payload_motor_index_m = (int32_t)motor_index },
     .temp_command_payload_motor_index_m_present = (type == FUSAIN_TEMP_CMD_WATCH_MOTOR),
     .temp_command_payload_uint3float = { .temp_command_payload_uint3float = target_temp },
     .temp_command_payload_uint3float_present = (type == FUSAIN_TEMP_CMD_SET_TARGET_TEMP),
@@ -722,7 +722,7 @@ void fusain_create_motor_config(fusain_packet_t* packet, uint64_t address,
    *                   5=max-rpm, 6=min-rpm, 7=min-pwm-duty
    */
   struct motor_config_payload cbor_payload = {
-    .motor_config_payload_motor_index_m = (uint32_t)config->motor,
+    .motor_config_payload_motor_index_m = (int32_t)config->motor,
     .motor_config_payload_uint1uint = { .motor_config_payload_uint1uint = config->pwm_period },
     .motor_config_payload_uint1uint_present = true,
     .motor_config_payload_uint2float = { .motor_config_payload_uint2float = config->pid_kp },
@@ -767,7 +767,7 @@ void fusain_create_pump_config(fusain_packet_t* packet, uint64_t address,
 
   /* CDDL key mapping: 0=pump, 1=pulse-ms, 2=recovery-ms */
   struct pump_config_payload cbor_payload = {
-    .pump_config_payload_pump_index_m = (uint32_t)config->pump,
+    .pump_config_payload_pump_index_m = (int32_t)config->pump,
     .pump_config_payload_uint1uint = { .pump_config_payload_uint1uint = config->pulse_ms },
     .pump_config_payload_uint1uint_present = true,
     .pump_config_payload_uint2uint = { .pump_config_payload_uint2uint = config->recovery_ms },
@@ -802,7 +802,7 @@ void fusain_create_temp_config(fusain_packet_t* packet, uint64_t address,
 
   /* CDDL key mapping: 0=thermometer, 1=pid-kp, 2=pid-ki, 3=pid-kd */
   struct temp_config_payload cbor_payload = {
-    .temp_config_payload_thermometer_index_m = (uint32_t)config->thermometer,
+    .temp_config_payload_thermometer_index_m = (int32_t)config->thermometer,
     .temp_config_payload_uint1float = { .temp_config_payload_uint1float = config->pid_kp },
     .temp_config_payload_uint1float_present = true,
     .temp_config_payload_uint2float = { .temp_config_payload_uint2float = config->pid_ki },
@@ -839,7 +839,7 @@ void fusain_create_glow_config(fusain_packet_t* packet, uint64_t address,
 
   /* CDDL key mapping: 0=glow, 1=max-duration */
   struct glow_config_payload cbor_payload = {
-    .glow_config_payload_glow_index_m = (uint32_t)config->glow,
+    .glow_config_payload_glow_index_m = (int32_t)config->glow,
     .glow_config_payload_uint1uint = { .glow_config_payload_uint1uint = config->max_duration_ms },
     .glow_config_payload_uint1uint_present = true,
   };
@@ -990,7 +990,7 @@ void fusain_create_motor_data(fusain_packet_t* packet, uint64_t address,
   offset = (size_t)header_len;
 
   struct motor_data_payload cbor_payload = {
-    .motor_data_payload_motor_index_m = (uint32_t)motor,
+    .motor_data_payload_motor_index_m = (int32_t)motor,
     .motor_data_payload_timestamp_m = timestamp,
     .motor_data_payload_uint2int = rpm,
     .motor_data_payload_uint3int = target,
@@ -1027,7 +1027,7 @@ void fusain_create_pump_data(fusain_packet_t* packet, uint64_t address,
   offset = (size_t)header_len;
 
   struct pump_data_payload cbor_payload = {
-    .pump_data_payload_pump_index_m = (uint32_t)pump,
+    .pump_data_payload_pump_index_m = (int32_t)pump,
     .pump_data_payload_timestamp_m = timestamp,
     .pump_data_payload_pump_event_m = (uint32_t)type,
     .pump_data_payload_uint3int = { .pump_data_payload_uint3int = rate },
@@ -1061,7 +1061,7 @@ void fusain_create_glow_data(fusain_packet_t* packet, uint64_t address,
   offset = (size_t)header_len;
 
   struct glow_data_payload cbor_payload = {
-    .glow_data_payload_glow_index_m = (uint32_t)glow,
+    .glow_data_payload_glow_index_m = (int32_t)glow,
     .glow_data_payload_timestamp_m = timestamp,
     .glow_data_payload_uint2bool = lit,
   };
@@ -1093,7 +1093,7 @@ void fusain_create_temp_data(fusain_packet_t* packet, uint64_t address,
   offset = (size_t)header_len;
 
   struct temp_data_payload cbor_payload = {
-    .temp_data_payload_thermometer_index_m = (uint32_t)thermometer,
+    .temp_data_payload_thermometer_index_m = (int32_t)thermometer,
     .temp_data_payload_timestamp_m = timestamp,
     .temp_data_payload_uint2float = reading,
     .temp_data_payload_uint3bool_present = false,
