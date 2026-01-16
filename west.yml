@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: Apache-2.0
+# West manifest for standalone CI testing of fusain module
+manifest:
+  version: "1.0"
+
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
+
+  projects:
+    - name: zephyr
+      remote: zephyrproject-rtos
+      revision: v4.3.0
+      import:
+        name-allowlist:
+          - zcbor
+
+  self:
+    path: fusain

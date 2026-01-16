@@ -27,7 +27,7 @@ tasks:
 
   clean:
     desc: Clean build artifacts
-    cmd: rm -rf build tests/build twister-out twister-out.*
+    cmd: rm -rf build tests/build build-standalone coverage-standalone twister-out twister-out.*
 
   auto-build:
     desc: Build the Fusain library automatically when files are saved
@@ -182,17 +182,39 @@ tasks:
     sources:
       - "{{.CDDL_PATH}}"
     generates:
-      - src/generated/fusain_cbor.c
-      - src/generated/fusain_cbor.h
+      - src/generated/cbor_decode.c
+      - src/generated/cbor_encode.c
+      - include/fusain/generated/cbor_types.h
+      - include/fusain/generated/cbor_decode.h
+      - include/fusain/generated/cbor_encode.h
     cmds:
-      - mkdir -p src/generated
+      - mkdir -p src/generated include/fusain/generated
+      # Generate CBOR code with zcbor
       - zcbor code
           --cddl {{.CDDL_PATH}}
           --output-c src/generated/fusain_cbor.c
           --output-h src/generated/fusain_cbor.h
           -t {{.CDDL_TYPES}}
           --decode --encode
-      - wc -l src/generated/*
+      # Rename source files
+      - mv src/generated/fusain_cbor_decode.c src/generated/cbor_decode.c
+      - mv src/generated/fusain_cbor_encode.c src/generated/cbor_encode.c
+      # Move headers to include directory
+      - mv src/generated/fusain_cbor_types.h include/fusain/generated/cbor_types.h
+      - mv src/generated/fusain_cbor_decode.h include/fusain/generated/cbor_decode.h
+      - mv src/generated/fusain_cbor_encode.h include/fusain/generated/cbor_encode.h
+      # Fix internal includes in headers
+      - sed -i 's/fusain_cbor_types\.h/cbor_types.h/g' include/fusain/generated/cbor_decode.h include/fusain/generated/cbor_encode.h
+      # Fix includes in source files to use proper paths
+      - sed -i 's|#include "fusain_cbor_decode.h"|#include <fusain/generated/cbor_decode.h>|g' src/generated/cbor_decode.c
+      - sed -i 's|#include "fusain_cbor_encode.h"|#include <fusain/generated/cbor_encode.h>|g' src/generated/cbor_encode.c
+      # Show results
+      - echo "Generated files:"
+      - wc -l src/generated/*.c include/fusain/generated/*.h
+      # Verify generated code compiles and passes tests
+      - echo ""
+      - echo "Verifying generated code with tests..."
+      - task: standalone-test
 
   # ============================================================
   # Standalone Mode Tasks (no Zephyr required)
@@ -283,3 +305,29 @@ tasks:
           CLI_ARGS: "1000000"
       - echo ""
       - echo "Standalone CI checks passed!"
+
+  ci-in-docker:
+    desc: Run full CI in Docker container
+    vars:
+      ZEPHYR_SDK_VERSION:
+        sh: cat .zephyr-sdk-version
+      UID:
+        sh: id -u
+      GID:
+        sh: id -g
+    env:
+      CI_SCRIPT: |
+        set -e
+        python3 -m venv /tmp/venv
+        . /tmp/venv/bin/activate
+        pip install --quiet west gcovr
+        west init -l fusain
+        west update --narrow -o=--depth=1
+        export ZEPHYR_BASE=/workdir/zephyr
+        west packages pip --install
+        cd fusain
+        rm -rf build-standalone tests/build
+        task ci
+    cmds:
+      - docker build --build-arg ZEPHYR_SDK_VERSION={{.ZEPHYR_SDK_VERSION}} -t fusain-ci {{.ROOT_DIR}}
+      - docker run --rm --user {{.UID}}:{{.GID}} -e HOME=/tmp -v {{.ROOT_DIR}}:/workdir/fusain -w /workdir fusain-ci bash -c "${CI_SCRIPT}"

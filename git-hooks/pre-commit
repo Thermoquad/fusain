@@ -10,6 +10,11 @@ set -e
 echo "Running pre-commit checks..."
 echo ""
 
+# Clean build artifacts first to avoid stale cache issues
+echo "0. Cleaning build artifacts..."
+task clean
+echo ""
+
 # Check formatting first (fast)
 echo "1. Checking code formatting..."
 if ! task format-check; then

@@ -1,5 +1,7 @@
 # Fusain Protocol Library
 
+[![CI](https://github.com/Thermoquad/fusain/actions/workflows/ci.yml/badge.svg)](https://github.com/Thermoquad/fusain/actions/workflows/ci.yml)
+
 > **Also known as:** "C Fusain" — the C implementation of the Fusain protocol.
 
 Reusable C library for encoding and decoding Fusain protocol packets.
@@ -298,6 +300,46 @@ task standalone-coverage
 
 Requires `gcovr` (`pip install gcovr`).
 
+### CI
+
+**Fast Local Testing (no Zephyr required):**
+
+```bash
+task standalone-ci   # Format check + standalone tests + 1M fuzz rounds
+```
+
+This is the fastest way to validate changes locally without a full Zephyr environment.
+
+**Full Local Testing (requires Zephyr):**
+
+```bash
+task ci              # Full CI: format + standalone + Zephyr tests + 5M fuzz rounds
+task ci-in-docker    # Same as above, in Zephyr Docker container (auto-cleans build artifacts)
+```
+
+**Git Hooks:**
+
+Install the pre-commit hook to automatically run CI checks before each commit:
+
+```bash
+task install-git-hooks
+```
+
+The hook runs:
+1. `task format-check` - Fast formatting validation
+2. `task ci` - Full test suite (takes several minutes)
+
+Skip with `git commit --no-verify` when needed.
+
+**GitHub Actions:**
+
+The workflow runs automatically on push/PR to `master` branch:
+- Format check
+- Standalone tests with 100% coverage verification
+- Standalone fuzz tests (1M rounds)
+- Zephyr tests with coverage verification
+- Zephyr fuzz tests (5M rounds)
+
 ## Integration with Applications
 
 ### Appliance Firmware (Zephyr)
@@ -311,9 +353,41 @@ See `apps/helios/src/communications/serial_handler.c` for reference implementati
 ### Controller Application
 Controller implementations should:
 - Use this library for protocol encoding/decoding
-- Implement UART/serial communication (platform-specific)
+- Implement transport-layer communication (UART, TCP, WebSocket, etc.)
 - Send periodic PING_REQUEST to maintain connection
 - Handle telemetry messages for monitoring
+
+## Development
+
+### CBOR Code Generation
+
+The library uses zcbor to generate CBOR encoding/decoding code from the CDDL schema.
+
+**Schema Location:** `origin/documentation/source/specifications/fusain/fusain.cddl`
+
+**Regenerating CBOR Code:**
+
+When the CDDL schema changes (e.g., new message fields, modified payload structures), regenerate the CBOR code:
+
+```bash
+# From the fusain directory
+task zcbor-generate
+```
+
+This task automatically:
+1. Generates CBOR code from the CDDL schema
+2. Renames files from `fusain_cbor_*` to `cbor_*` prefix
+3. Moves headers to `include/fusain/generated/`
+4. Fixes include paths in generated files
+5. Runs tests to verify the generated code compiles and works correctly
+
+**After Regeneration:**
+
+If the CDDL schema changed field names or types, you may need to:
+1. Compare the new `cbor_types.h` against the old version for struct field changes
+2. Update `src/fusain.c` to use any new field names from the regenerated types
+
+See `CLAUDE.md` for detailed documentation.
 
 ## License
 

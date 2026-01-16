@@ -4,8 +4,8 @@
  * Generated with a --default-max-qty of 3
  */
 
-#ifndef CBOR_TYPES_H__
-#define CBOR_TYPES_H__
+#ifndef FUSAIN_CBOR_TYPES_H__
+#define FUSAIN_CBOR_TYPES_H__
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -42,10 +42,6 @@ struct device_announce_payload {
 	uint32_t device_announce_payload_uint3uint;
 };
 
-struct error_invalid_cmd_payload {
-	int32_t error_invalid_cmd_payload_uint0int;
-};
-
 struct motor_config_payload_uint1uint {
 	uint32_t motor_config_payload_uint1uint;
 };
@@ -75,7 +71,7 @@ struct motor_config_payload_uint7uint {
 };
 
 struct motor_config_payload {
-	uint32_t motor_config_payload_motor_index_m;
+	int32_t motor_config_payload_motor_index_m;
 	struct motor_config_payload_uint1uint motor_config_payload_uint1uint;
 	bool motor_config_payload_uint1uint_present;
 	struct motor_config_payload_uint2float motor_config_payload_uint2float;
@@ -101,7 +97,7 @@ struct pump_config_payload_uint2uint {
 };
 
 struct pump_config_payload {
-	uint32_t pump_config_payload_pump_index_m;
+	int32_t pump_config_payload_pump_index_m;
 	struct pump_config_payload_uint1uint pump_config_payload_uint1uint;
 	bool pump_config_payload_uint1uint_present;
 	struct pump_config_payload_uint2uint pump_config_payload_uint2uint;
@@ -121,7 +117,7 @@ struct temp_config_payload_uint3float {
 };
 
 struct temp_config_payload {
-	uint32_t temp_config_payload_thermometer_index_m;
+	int32_t temp_config_payload_thermometer_index_m;
 	struct temp_config_payload_uint1float temp_config_payload_uint1float;
 	bool temp_config_payload_uint1float_present;
 	struct temp_config_payload_uint2float temp_config_payload_uint2float;
@@ -135,7 +131,7 @@ struct glow_config_payload_uint1uint {
 };
 
 struct glow_config_payload {
-	uint32_t glow_config_payload_glow_index_m;
+	int32_t glow_config_payload_glow_index_m;
 	struct glow_config_payload_uint1uint glow_config_payload_uint1uint;
 	bool glow_config_payload_uint1uint_present;
 };
@@ -155,22 +151,22 @@ struct state_command_payload {
 };
 
 struct motor_command_payload {
-	uint32_t motor_command_payload_motor_index_m;
+	int32_t motor_command_payload_motor_index_m;
 	int32_t motor_command_payload_uint1int;
 };
 
 struct pump_command_payload {
-	uint32_t pump_command_payload_pump_index_m;
+	int32_t pump_command_payload_pump_index_m;
 	int32_t pump_command_payload_uint1int;
 };
 
 struct glow_command_payload {
-	uint32_t glow_command_payload_glow_index_m;
+	int32_t glow_command_payload_glow_index_m;
 	int32_t glow_command_payload_uint1int;
 };
 
 struct temp_command_payload_motor_index_m {
-	uint32_t temp_command_payload_motor_index_m;
+	int32_t temp_command_payload_motor_index_m;
 };
 
 struct temp_command_payload_uint3float {
@@ -178,7 +174,7 @@ struct temp_command_payload_uint3float {
 };
 
 struct temp_command_payload {
-	uint32_t temp_command_payload_thermometer_index_m;
+	int32_t temp_command_payload_thermometer_index_m;
 	uint32_t temp_command_payload_temp_cmd_type_m;
 	struct temp_command_payload_motor_index_m temp_command_payload_motor_index_m;
 	bool temp_command_payload_motor_index_m_present;
@@ -220,7 +216,7 @@ struct motor_data_payload_uint7uint {
 };
 
 struct motor_data_payload {
-	uint32_t motor_data_payload_motor_index_m;
+	int32_t motor_data_payload_motor_index_m;
 	uint32_t motor_data_payload_timestamp_m;
 	int32_t motor_data_payload_uint2int;
 	int32_t motor_data_payload_uint3int;
@@ -239,7 +235,7 @@ struct pump_data_payload_uint3int {
 };
 
 struct pump_data_payload {
-	uint32_t pump_data_payload_pump_index_m;
+	int32_t pump_data_payload_pump_index_m;
 	uint32_t pump_data_payload_timestamp_m;
 	uint32_t pump_data_payload_pump_event_m;
 	struct pump_data_payload_uint3int pump_data_payload_uint3int;
@@ -247,7 +243,7 @@ struct pump_data_payload {
 };
 
 struct glow_data_payload {
-	uint32_t glow_data_payload_glow_index_m;
+	int32_t glow_data_payload_glow_index_m;
 	uint32_t glow_data_payload_timestamp_m;
 	bool glow_data_payload_uint2bool;
 };
@@ -265,7 +261,7 @@ struct temp_data_payload_uint5float {
 };
 
 struct temp_data_payload {
-	uint32_t temp_data_payload_thermometer_index_m;
+	int32_t temp_data_payload_thermometer_index_m;
 	uint32_t temp_data_payload_timestamp_m;
 	double temp_data_payload_uint2float;
 	struct temp_data_payload_uint3bool temp_data_payload_uint3bool;
@@ -280,12 +276,34 @@ struct ping_response_payload {
 	uint32_t ping_response_payload_timestamp_m;
 };
 
+struct error_invalid_cmd_payload_uint1uint {
+	uint32_t error_invalid_cmd_payload_uint1uint;
+};
+
+struct error_invalid_cmd_payload_constraint_m {
+	uint32_t error_invalid_cmd_payload_constraint_m;
+};
+
+struct error_invalid_cmd_payload {
+	int32_t error_invalid_cmd_payload_uint0int;
+	struct error_invalid_cmd_payload_uint1uint error_invalid_cmd_payload_uint1uint;
+	bool error_invalid_cmd_payload_uint1uint_present;
+	struct error_invalid_cmd_payload_constraint_m error_invalid_cmd_payload_constraint_m;
+	bool error_invalid_cmd_payload_constraint_m_present;
+};
+
+struct error_state_reject_payload_rejection_reason_m {
+	uint32_t error_state_reject_payload_rejection_reason_m;
+};
+
 struct error_state_reject_payload {
-	uint32_t error_state_reject_payload_state_m;
+	int32_t error_state_reject_payload_uint0int;
+	struct error_state_reject_payload_rejection_reason_m error_state_reject_payload_rejection_reason_m;
+	bool error_state_reject_payload_rejection_reason_m_present;
 };
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* CBOR_TYPES_H__ */
+#endif /* FUSAIN_CBOR_TYPES_H__ */

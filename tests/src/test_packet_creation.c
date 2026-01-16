@@ -371,11 +371,11 @@ ZTEST(fusain_packets, test_create_temp_data)
   zassert_true(verify_roundtrip(&packet, "temp_data"), "Round-trip should succeed");
 }
 
-/* Test ERROR_INVALID_CMD packet creation */
+/* Test ERROR_INVALID_CMD packet creation (basic, no optional fields) */
 ZTEST(fusain_packets, test_create_error_invalid_cmd)
 {
   fusain_packet_t packet;
-  fusain_create_error_invalid_cmd(&packet, 0x5678, 0x42);
+  fusain_create_error_invalid_cmd(&packet, 0x5678, FUSAIN_INVALID_CMD_INVALID_PARAM, -1, -1);
 
   zassert_equal(packet.msg_type, FUSAIN_MSG_ERROR_INVALID_CMD, "Type should match");
   zassert_equal(packet.address, 0x5678, "Address should match");
@@ -383,16 +383,42 @@ ZTEST(fusain_packets, test_create_error_invalid_cmd)
   zassert_true(verify_roundtrip(&packet, "error_invalid_cmd"), "Round-trip should succeed");
 }
 
-/* Test ERROR_STATE_REJECT packet creation */
+/* Test ERROR_INVALID_CMD with extended fields */
+ZTEST(fusain_packets, test_create_error_invalid_cmd_extended)
+{
+  fusain_packet_t packet;
+  fusain_create_error_invalid_cmd(&packet, 0x5678, FUSAIN_INVALID_CMD_INVALID_PARAM,
+      1, FUSAIN_CONSTRAINT_VALUE_TOO_HIGH);
+
+  zassert_equal(packet.msg_type, FUSAIN_MSG_ERROR_INVALID_CMD, "Type should match");
+  zassert_equal(packet.address, 0x5678, "Address should match");
+  zassert_true(packet.length > 0, "Payload should not be empty");
+  zassert_true(verify_roundtrip(&packet, "error_invalid_cmd_ext"), "Round-trip should succeed");
+}
+
+/* Test ERROR_STATE_REJECT packet creation (basic, no optional field) */
 ZTEST(fusain_packets, test_create_error_state_reject)
 {
   fusain_packet_t packet;
-  fusain_create_error_state_reject(&packet, 0x6789, FUSAIN_STATE_HEATING);
+  fusain_create_error_state_reject(&packet, 0x6789, FUSAIN_STATE_HEATING, -1);
 
   zassert_equal(packet.msg_type, FUSAIN_MSG_ERROR_STATE_REJECT, "Type should match");
   zassert_equal(packet.address, 0x6789, "Address should match");
   zassert_true(packet.length > 0, "Payload should not be empty");
   zassert_true(verify_roundtrip(&packet, "error_state_reject"), "Round-trip should succeed");
+}
+
+/* Test ERROR_STATE_REJECT with rejection_reason */
+ZTEST(fusain_packets, test_create_error_state_reject_extended)
+{
+  fusain_packet_t packet;
+  fusain_create_error_state_reject(&packet, 0x6789, FUSAIN_STATE_HEATING,
+      FUSAIN_REJECTION_RESOURCE_CONTROLLED);
+
+  zassert_equal(packet.msg_type, FUSAIN_MSG_ERROR_STATE_REJECT, "Type should match");
+  zassert_equal(packet.address, 0x6789, "Address should match");
+  zassert_true(packet.length > 0, "Payload should not be empty");
+  zassert_true(verify_roundtrip(&packet, "error_state_reject_ext"), "Round-trip should succeed");
 }
 
 /* Test suite setup */

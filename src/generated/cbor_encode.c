@@ -8,9 +8,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
-#include <zcbor_encode.h>
-#include <zcbor_print.h>
+#include "zcbor_encode.h"
 #include <fusain/generated/cbor_encode.h>
+#include "zcbor_print.h"
 
 #if DEFAULT_MAX_QTY != 3
 #error "The type file was generated with a different default_max_qty than this file"
@@ -50,6 +50,9 @@ static bool encode_repeated_pump_data_payload_uint3int(zcbor_state_t *state, con
 static bool encode_repeated_temp_data_payload_uint3bool(zcbor_state_t *state, const struct temp_data_payload_uint3bool *input);
 static bool encode_repeated_temp_data_payload_uint4int(zcbor_state_t *state, const struct temp_data_payload_uint4int *input);
 static bool encode_repeated_temp_data_payload_uint5float(zcbor_state_t *state, const struct temp_data_payload_uint5float *input);
+static bool encode_repeated_error_invalid_cmd_payload_uint1uint(zcbor_state_t *state, const struct error_invalid_cmd_payload_uint1uint *input);
+static bool encode_repeated_error_invalid_cmd_payload_constraint_m(zcbor_state_t *state, const struct error_invalid_cmd_payload_constraint_m *input);
+static bool encode_repeated_error_state_reject_payload_rejection_reason_m(zcbor_state_t *state, const struct error_state_reject_payload_rejection_reason_m *input);
 static bool encode_error_state_reject_payload(zcbor_state_t *state, const struct error_state_reject_payload *input);
 static bool encode_error_invalid_cmd_payload(zcbor_state_t *state, const struct error_invalid_cmd_payload *input);
 static bool encode_ping_response_payload(zcbor_state_t *state, const struct ping_response_payload *input);
@@ -250,8 +253,9 @@ static bool encode_repeated_temp_command_payload_motor_index_m(
 	zcbor_log("%s\r\n", __func__);
 
 	bool res = ((((zcbor_uint32_put(state, (2))))
-	&& ((((((*input).temp_command_payload_motor_index_m <= UINT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
-	&& (zcbor_uint32_encode(state, (&(*input).temp_command_payload_motor_index_m)))));
+	&& ((((((*input).temp_command_payload_motor_index_m >= INT8_MIN)
+	&& ((*input).temp_command_payload_motor_index_m <= INT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
+	&& (zcbor_int32_encode(state, (&(*input).temp_command_payload_motor_index_m)))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -379,14 +383,52 @@ static bool encode_repeated_temp_data_payload_uint5float(
 	return res;
 }
 
+static bool encode_repeated_error_invalid_cmd_payload_uint1uint(
+		zcbor_state_t *state, const struct error_invalid_cmd_payload_uint1uint *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (1))))
+	&& (zcbor_uint32_encode(state, (&(*input).error_invalid_cmd_payload_uint1uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_error_invalid_cmd_payload_constraint_m(
+		zcbor_state_t *state, const struct error_invalid_cmd_payload_constraint_m *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (2))))
+	&& ((((((*input).error_invalid_cmd_payload_constraint_m <= UINT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
+	&& (zcbor_uint32_encode(state, (&(*input).error_invalid_cmd_payload_constraint_m)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_error_state_reject_payload_rejection_reason_m(
+		zcbor_state_t *state, const struct error_state_reject_payload_rejection_reason_m *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (1))))
+	&& ((((((*input).error_state_reject_payload_rejection_reason_m <= UINT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
+	&& (zcbor_uint32_encode(state, (&(*input).error_state_reject_payload_rejection_reason_m)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool encode_error_state_reject_payload(
 		zcbor_state_t *state, const struct error_state_reject_payload *input)
 {
 	zcbor_log("%s\r\n", __func__);
 
-	bool res = (((zcbor_map_start_encode(state, 1) && (((((zcbor_uint32_put(state, (0))))
-	&& ((((((*input).error_state_reject_payload_state_m <= UINT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
-	&& (zcbor_uint32_encode(state, (&(*input).error_state_reject_payload_state_m))))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 1))));
+	bool res = (((zcbor_map_start_encode(state, 2) && (((((zcbor_uint32_put(state, (0))))
+	&& (zcbor_int32_encode(state, (&(*input).error_state_reject_payload_uint0int))))
+	&& (!(*input).error_state_reject_payload_rejection_reason_m_present || encode_repeated_error_state_reject_payload_rejection_reason_m(state, (&(*input).error_state_reject_payload_rejection_reason_m)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 2))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -397,8 +439,10 @@ static bool encode_error_invalid_cmd_payload(
 {
 	zcbor_log("%s\r\n", __func__);
 
-	bool res = (((zcbor_map_start_encode(state, 1) && (((((zcbor_uint32_put(state, (0))))
-	&& (zcbor_int32_encode(state, (&(*input).error_invalid_cmd_payload_uint0int))))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 1))));
+	bool res = (((zcbor_map_start_encode(state, 3) && (((((zcbor_uint32_put(state, (0))))
+	&& (zcbor_int32_encode(state, (&(*input).error_invalid_cmd_payload_uint0int))))
+	&& (!(*input).error_invalid_cmd_payload_uint1uint_present || encode_repeated_error_invalid_cmd_payload_uint1uint(state, (&(*input).error_invalid_cmd_payload_uint1uint)))
+	&& (!(*input).error_invalid_cmd_payload_constraint_m_present || encode_repeated_error_invalid_cmd_payload_constraint_m(state, (&(*input).error_invalid_cmd_payload_constraint_m)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 3))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -445,8 +489,9 @@ static bool encode_temp_data_payload(
 	zcbor_log("%s\r\n", __func__);
 
 	bool res = (((zcbor_map_start_encode(state, 6) && (((((zcbor_uint32_put(state, (0))))
-	&& ((((((*input).temp_data_payload_thermometer_index_m <= UINT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
-	&& (zcbor_uint32_encode(state, (&(*input).temp_data_payload_thermometer_index_m))))
+	&& ((((((*input).temp_data_payload_thermometer_index_m >= INT8_MIN)
+	&& ((*input).temp_data_payload_thermometer_index_m <= INT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
+	&& (zcbor_int32_encode(state, (&(*input).temp_data_payload_thermometer_index_m))))
 	&& (((zcbor_uint32_put(state, (1))))
 	&& ((((((*input).temp_data_payload_timestamp_m <= UINT32_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
 	&& (zcbor_uint32_encode(state, (&(*input).temp_data_payload_timestamp_m))))
@@ -466,8 +511,9 @@ static bool encode_glow_data_payload(
 	zcbor_log("%s\r\n", __func__);
 
 	bool res = (((zcbor_map_start_encode(state, 3) && (((((zcbor_uint32_put(state, (0))))
-	&& ((((((*input).glow_data_payload_glow_index_m <= UINT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
-	&& (zcbor_uint32_encode(state, (&(*input).glow_data_payload_glow_index_m))))
+	&& ((((((*input).glow_data_payload_glow_index_m >= INT8_MIN)
+	&& ((*input).glow_data_payload_glow_index_m <= INT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
+	&& (zcbor_int32_encode(state, (&(*input).glow_data_payload_glow_index_m))))
 	&& (((zcbor_uint32_put(state, (1))))
 	&& ((((((*input).glow_data_payload_timestamp_m <= UINT32_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
 	&& (zcbor_uint32_encode(state, (&(*input).glow_data_payload_timestamp_m))))
@@ -484,8 +530,9 @@ static bool encode_pump_data_payload(
 	zcbor_log("%s\r\n", __func__);
 
 	bool res = (((zcbor_map_start_encode(state, 4) && (((((zcbor_uint32_put(state, (0))))
-	&& ((((((*input).pump_data_payload_pump_index_m <= UINT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
-	&& (zcbor_uint32_encode(state, (&(*input).pump_data_payload_pump_index_m))))
+	&& ((((((*input).pump_data_payload_pump_index_m >= INT8_MIN)
+	&& ((*input).pump_data_payload_pump_index_m <= INT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
+	&& (zcbor_int32_encode(state, (&(*input).pump_data_payload_pump_index_m))))
 	&& (((zcbor_uint32_put(state, (1))))
 	&& ((((((*input).pump_data_payload_timestamp_m <= UINT32_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
 	&& (zcbor_uint32_encode(state, (&(*input).pump_data_payload_timestamp_m))))
@@ -504,8 +551,9 @@ static bool encode_motor_data_payload(
 	zcbor_log("%s\r\n", __func__);
 
 	bool res = (((zcbor_map_start_encode(state, 8) && (((((zcbor_uint32_put(state, (0))))
-	&& ((((((*input).motor_data_payload_motor_index_m <= UINT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
-	&& (zcbor_uint32_encode(state, (&(*input).motor_data_payload_motor_index_m))))
+	&& ((((((*input).motor_data_payload_motor_index_m >= INT8_MIN)
+	&& ((*input).motor_data_payload_motor_index_m <= INT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
+	&& (zcbor_int32_encode(state, (&(*input).motor_data_payload_motor_index_m))))
 	&& (((zcbor_uint32_put(state, (1))))
 	&& ((((((*input).motor_data_payload_timestamp_m <= UINT32_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
 	&& (zcbor_uint32_encode(state, (&(*input).motor_data_payload_timestamp_m))))
@@ -563,8 +611,9 @@ static bool encode_temp_command_payload(
 	zcbor_log("%s\r\n", __func__);
 
 	bool res = (((zcbor_map_start_encode(state, 4) && (((((zcbor_uint32_put(state, (0))))
-	&& ((((((*input).temp_command_payload_thermometer_index_m <= UINT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
-	&& (zcbor_uint32_encode(state, (&(*input).temp_command_payload_thermometer_index_m))))
+	&& ((((((*input).temp_command_payload_thermometer_index_m >= INT8_MIN)
+	&& ((*input).temp_command_payload_thermometer_index_m <= INT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
+	&& (zcbor_int32_encode(state, (&(*input).temp_command_payload_thermometer_index_m))))
 	&& (((zcbor_uint32_put(state, (1))))
 	&& ((((((*input).temp_command_payload_temp_cmd_type_m <= UINT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
 	&& (zcbor_uint32_encode(state, (&(*input).temp_command_payload_temp_cmd_type_m))))
@@ -581,8 +630,9 @@ static bool encode_glow_command_payload(
 	zcbor_log("%s\r\n", __func__);
 
 	bool res = (((zcbor_map_start_encode(state, 2) && (((((zcbor_uint32_put(state, (0))))
-	&& ((((((*input).glow_command_payload_glow_index_m <= UINT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
-	&& (zcbor_uint32_encode(state, (&(*input).glow_command_payload_glow_index_m))))
+	&& ((((((*input).glow_command_payload_glow_index_m >= INT8_MIN)
+	&& ((*input).glow_command_payload_glow_index_m <= INT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
+	&& (zcbor_int32_encode(state, (&(*input).glow_command_payload_glow_index_m))))
 	&& (((zcbor_uint32_put(state, (1))))
 	&& (zcbor_int32_encode(state, (&(*input).glow_command_payload_uint1int))))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 2))));
 
@@ -596,8 +646,9 @@ static bool encode_pump_command_payload(
 	zcbor_log("%s\r\n", __func__);
 
 	bool res = (((zcbor_map_start_encode(state, 2) && (((((zcbor_uint32_put(state, (0))))
-	&& ((((((*input).pump_command_payload_pump_index_m <= UINT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
-	&& (zcbor_uint32_encode(state, (&(*input).pump_command_payload_pump_index_m))))
+	&& ((((((*input).pump_command_payload_pump_index_m >= INT8_MIN)
+	&& ((*input).pump_command_payload_pump_index_m <= INT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
+	&& (zcbor_int32_encode(state, (&(*input).pump_command_payload_pump_index_m))))
 	&& (((zcbor_uint32_put(state, (1))))
 	&& (zcbor_int32_encode(state, (&(*input).pump_command_payload_uint1int))))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 2))));
 
@@ -611,8 +662,9 @@ static bool encode_motor_command_payload(
 	zcbor_log("%s\r\n", __func__);
 
 	bool res = (((zcbor_map_start_encode(state, 2) && (((((zcbor_uint32_put(state, (0))))
-	&& ((((((*input).motor_command_payload_motor_index_m <= UINT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
-	&& (zcbor_uint32_encode(state, (&(*input).motor_command_payload_motor_index_m))))
+	&& ((((((*input).motor_command_payload_motor_index_m >= INT8_MIN)
+	&& ((*input).motor_command_payload_motor_index_m <= INT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
+	&& (zcbor_int32_encode(state, (&(*input).motor_command_payload_motor_index_m))))
 	&& (((zcbor_uint32_put(state, (1))))
 	&& (zcbor_int32_encode(state, (&(*input).motor_command_payload_uint1int))))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 2))));
 
@@ -680,8 +732,9 @@ static bool encode_glow_config_payload(
 	zcbor_log("%s\r\n", __func__);
 
 	bool res = (((zcbor_map_start_encode(state, 2) && (((((zcbor_uint32_put(state, (0))))
-	&& ((((((*input).glow_config_payload_glow_index_m <= UINT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
-	&& (zcbor_uint32_encode(state, (&(*input).glow_config_payload_glow_index_m))))
+	&& ((((((*input).glow_config_payload_glow_index_m >= INT8_MIN)
+	&& ((*input).glow_config_payload_glow_index_m <= INT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
+	&& (zcbor_int32_encode(state, (&(*input).glow_config_payload_glow_index_m))))
 	&& (!(*input).glow_config_payload_uint1uint_present || encode_repeated_glow_config_payload_uint1uint(state, (&(*input).glow_config_payload_uint1uint)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 2))));
 
 	log_result(state, res, __func__);
@@ -694,8 +747,9 @@ static bool encode_temp_config_payload(
 	zcbor_log("%s\r\n", __func__);
 
 	bool res = (((zcbor_map_start_encode(state, 4) && (((((zcbor_uint32_put(state, (0))))
-	&& ((((((*input).temp_config_payload_thermometer_index_m <= UINT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
-	&& (zcbor_uint32_encode(state, (&(*input).temp_config_payload_thermometer_index_m))))
+	&& ((((((*input).temp_config_payload_thermometer_index_m >= INT8_MIN)
+	&& ((*input).temp_config_payload_thermometer_index_m <= INT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
+	&& (zcbor_int32_encode(state, (&(*input).temp_config_payload_thermometer_index_m))))
 	&& (!(*input).temp_config_payload_uint1float_present || encode_repeated_temp_config_payload_uint1float(state, (&(*input).temp_config_payload_uint1float)))
 	&& (!(*input).temp_config_payload_uint2float_present || encode_repeated_temp_config_payload_uint2float(state, (&(*input).temp_config_payload_uint2float)))
 	&& (!(*input).temp_config_payload_uint3float_present || encode_repeated_temp_config_payload_uint3float(state, (&(*input).temp_config_payload_uint3float)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 4))));
@@ -710,8 +764,9 @@ static bool encode_pump_config_payload(
 	zcbor_log("%s\r\n", __func__);
 
 	bool res = (((zcbor_map_start_encode(state, 3) && (((((zcbor_uint32_put(state, (0))))
-	&& ((((((*input).pump_config_payload_pump_index_m <= UINT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
-	&& (zcbor_uint32_encode(state, (&(*input).pump_config_payload_pump_index_m))))
+	&& ((((((*input).pump_config_payload_pump_index_m >= INT8_MIN)
+	&& ((*input).pump_config_payload_pump_index_m <= INT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
+	&& (zcbor_int32_encode(state, (&(*input).pump_config_payload_pump_index_m))))
 	&& (!(*input).pump_config_payload_uint1uint_present || encode_repeated_pump_config_payload_uint1uint(state, (&(*input).pump_config_payload_uint1uint)))
 	&& (!(*input).pump_config_payload_uint2uint_present || encode_repeated_pump_config_payload_uint2uint(state, (&(*input).pump_config_payload_uint2uint)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 3))));
 
@@ -725,8 +780,9 @@ static bool encode_motor_config_payload(
 	zcbor_log("%s\r\n", __func__);
 
 	bool res = (((zcbor_map_start_encode(state, 8) && (((((zcbor_uint32_put(state, (0))))
-	&& ((((((*input).motor_config_payload_motor_index_m <= UINT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
-	&& (zcbor_uint32_encode(state, (&(*input).motor_config_payload_motor_index_m))))
+	&& ((((((*input).motor_config_payload_motor_index_m >= INT8_MIN)
+	&& ((*input).motor_config_payload_motor_index_m <= INT8_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
+	&& (zcbor_int32_encode(state, (&(*input).motor_config_payload_motor_index_m))))
 	&& (!(*input).motor_config_payload_uint1uint_present || encode_repeated_motor_config_payload_uint1uint(state, (&(*input).motor_config_payload_uint1uint)))
 	&& (!(*input).motor_config_payload_uint2float_present || encode_repeated_motor_config_payload_uint2float(state, (&(*input).motor_config_payload_uint2float)))
 	&& (!(*input).motor_config_payload_uint3float_present || encode_repeated_motor_config_payload_uint3float(state, (&(*input).motor_config_payload_uint3float)))
